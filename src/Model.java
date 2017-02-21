@@ -11,7 +11,7 @@ import org.apache.commons.math3.analysis.interpolation.*;
 public class Model {
 
     // Constants used when generating the stopping power function
-    final double MINIMUM_STOPPING_POWER_ENERGY = 0.1;       // MeV
+    final double MINIMUM_STOPPING_POWER_ENERGY = ParticleHistoryTask.ENERGY_CUTOFF;       // MeV
     final int NUM_ENERGY_NODES = 50;
 
     private ParticleDistribution testParticleDistribution;
@@ -30,8 +30,8 @@ public class Model {
 
     public double getYieldRatio(int totalParticles){
 
-        //int numCPUs = Runtime.getRuntime().availableProcessors();
-        int numCPUs = 1;
+        int numCPUs = Runtime.getRuntime().availableProcessors();
+        //int numCPUs = 1;
         int totalPerThread = (int) Math.ceil((double) totalParticles / numCPUs);
 
         Thread[] threads = new Thread[numCPUs];
@@ -41,7 +41,10 @@ public class Model {
         for (int i = 0; i < numCPUs; i++){
             tasks[i] = new ParticleHistoryTask(
                     crossSection, testParticleDistribution, plasma, stoppingPower, totalPerThread);
+
             //tasks[i].setDebugMode(true);
+            //tasks[i].run();
+
             threads[i] = new Thread(tasks[i]);
             threads[i].start();
         }

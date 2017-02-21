@@ -41,7 +41,7 @@ public class ParticleDistribution {
         double sigma = Math.sqrt(factor * Q * temperature);                             // Spectral width (keV)
 
         Distribution energyDistribution = Distribution.normDistribution(mu, sigma);
-        return new ParticleDistribution(1, 3, radialDistribution, energyDistribution);
+        return new ParticleDistribution(2, 3, radialDistribution, energyDistribution);
     }
 
 
@@ -86,7 +86,7 @@ public class ParticleDistribution {
         double r = radialDistribution.sample() * plasma.getRadiusBound(theta, phi);
 
         // Rescale our position vector to this magnitude
-        position.scalarMultiply(r);
+        position = position.scalarMultiply(r);
         particle.setPosition(position);
 
         // Sample a random direction vector

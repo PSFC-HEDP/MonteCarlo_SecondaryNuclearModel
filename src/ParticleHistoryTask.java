@@ -25,8 +25,8 @@ public class ParticleHistoryTask implements RunnableFuture {
     /**
      * Step parameters
      */
-    private final int NUM_STEPS_PER_SYSTEM_SIZE    = 100;
-    private final double ENERGY_CUTOFF = 0.01;
+    private final int NUM_STEPS_PER_SYSTEM_SIZE = 200;
+    static final double ENERGY_CUTOFF = 0.01;
 
 
 
@@ -65,11 +65,25 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         for (int i = 0; i < numParticles; i++) {
 
-            if (debugMode)      System.out.printf("Starting history %d ... \n", (i+1));
-
             int totalSteps = 0;
             double historyReactionProbability = 0.0;
             Particle particle = particleDistribution.sample(plasma);
+            double energyToLose = particle.getE() - ENERGY_CUTOFF;
+
+
+            // DEBUG MODE LINE
+            if (debugMode){
+                Vector3D position = particle.getPosition();
+                Vector3D direction = particle.getDirection();
+                System.out.printf("Starting history %d with:\n" +
+                        "rx = %+.4e cm, ry = %+.4e cm, rz = %+.4e cm\n" +
+                        "dx = %+.4e cm, dy = %+.4e cm, dz = %+.4e cm\n" +
+                        "E  = %+.4e MeV\n",
+
+                        (i+1), position.getX(), position.getY(), position.getZ(),
+                        direction.getX(), direction.getY(), direction.getZ(), particle.getE());
+            }
+
 
             // While the particle is inside this plasma
             while (plasma.getIsInside(particle.getPosition()) && particle.getE() >  ENERGY_CUTOFF) {
@@ -87,15 +101,28 @@ public class ParticleHistoryTask implements RunnableFuture {
                 double r = position.getNorm() / plasma.getRadiusBound(theta, phi);      // Normalized r
 
 
+                // DEBUG MODE LINE
+                if (debugMode){
+                    System.out.printf("    %d: rx = %+.4e cm, ry = %+.4e cm, rz = %+.4e cm, E = %+.4e MeV\n",
+                            totalSteps, position.getX(), position.getY(), position.getZ(), particle.getE());
+                }
+
+
                 // Grab all of the plasma quantities at this position
                 double nD = plasma.getDeuteronNumberDensity(particle.getPosition());
                 double sigma = 1e-24 * crossSection.evaluate(particle, backgroundDeuteron);
                 double dEdx = stoppingPower.value(particle.getE(), r);
 
 
+                // If the particle is losing a significant amount of energy, we need to take smaller steps
+                dx = Math.min(dx, -energyToLose / dEdx / NUM_STEPS_PER_SYSTEM_SIZE);
+
+
                 // Calculate the reaction probability
                 historyReactionProbability += nD * sigma * dx * (1 - historyReactionProbability);
                 particle.step(dx, dEdx);
+
+                totalSteps++;
             }
             reactionProbability += historyReactionProbability;
         }
