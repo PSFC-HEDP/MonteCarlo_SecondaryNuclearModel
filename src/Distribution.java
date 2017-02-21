@@ -1,6 +1,8 @@
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+import org.apache.commons.math3.exception.OutOfRangeException;
 import org.apache.commons.math3.stat.descriptive.summary.Sum;
+import org.apache.commons.math3.util.FastMath;
 
 /**
  * Class that represents an arbitrary distribution used for random sampling
@@ -61,7 +63,15 @@ public class Distribution {
      * Randomly sample from this distribution
      */
     double sample(){
-        return inverseCumulativeProbability.value(Math.random());
+        double xR = FastMath.random();
+        try {
+            return inverseCumulativeProbability.value(xR);
+        }catch (OutOfRangeException e){
+            double[] knots = inverseCumulativeProbability.getKnots();
+            xR = FastMath.max(xR, knots[0]);
+            xR = FastMath.min(xR, knots[knots.length-1]);
+            return inverseCumulativeProbability.value(xR);
+        }
     }
 
     double[] sample(int N){

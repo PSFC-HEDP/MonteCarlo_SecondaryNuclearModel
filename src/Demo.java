@@ -5,8 +5,9 @@ public class Demo {
     public static void main(String... args) throws Exception {
 
 
-	File cStopPowFile = new File("cStopPow/libcStopPow.so");
-        System.load(cStopPowFile.getAbsolutePath());
+	    //File cStopPowFile = new File("cStopPow/libcStopPow.so");        // Linux
+        File cStopPowFile = new File("src/cStopPow/cStopPow.DLL");       // Windows
+	    System.load(cStopPowFile.getAbsolutePath());
 
 
         //generateYieldRatioCurve(1.0, 1.0, false);

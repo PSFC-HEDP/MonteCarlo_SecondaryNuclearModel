@@ -13,11 +13,11 @@ public class Utils {
     public static final double DD_3He_birthEnergy_MeV = 0.82;
 
 
-    public static final String D3He_ENDF_XS_FILE = "../data/d3He_BoschHale.dat";
-    public static final String DT_ENDF_XS_FILE   = "../data/dT_BoschHale.dat";
+    public static final String D3He_ENDF_XS_FILE = "./data/d3He_BoschHale.dat";
+    public static final String DT_ENDF_XS_FILE   = "./data/dT_BoschHale.dat";
 
-    public static final String DDp_REACTIVITY_FILE = "../data/DDp_Reactivities.dat";
-    public static final String DDn_REACTIVITY_FILE = "../data/DDn_Reactivities.dat";
+    public static final String DDp_REACTIVITY_FILE = "./data/DDp_Reactivities.dat";
+    public static final String DDn_REACTIVITY_FILE = "./data/DDn_Reactivities.dat";
 
     public static double[] linspace(double a, double b, int N){
         double[] nodes = new double[N];
