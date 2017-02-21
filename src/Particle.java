@@ -83,9 +83,15 @@ public class Particle {
      * Step this Particle some distance through a material with stopping power dEdx
      */
 
-    public void step(double distance, double dEdx){
-        position = position.add(distance, direction);
-        E += dEdx*distance;
+    public Particle step(double distance, double dEdx){
+        Vector3D newPosition = this.position.add(distance, direction);
+        double newEnergy = this.E + dEdx*distance;
+
+        Particle particle = new Particle(newEnergy, this.getZ(), this.getA());
+        particle.setPosition(newPosition);
+        particle.setDirection(this.getDirection());
+
+        return particle;
     }
 
 

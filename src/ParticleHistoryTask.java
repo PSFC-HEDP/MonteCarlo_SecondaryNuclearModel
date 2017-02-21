@@ -1,6 +1,7 @@
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolatingFunction;
 import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
+import org.apache.commons.math3.util.FastMath;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
@@ -26,7 +27,9 @@ public class ParticleHistoryTask implements RunnableFuture {
      * Step parameters
      */
     private final int NUM_STEPS_PER_SYSTEM_SIZE = 200;
-    static final double ENERGY_CUTOFF = 0.01;
+
+    static final double ENERGY_CUTOFF = 0.01;                   // MeV
+    private final double ACCEPTABLE_ENERGY_ERROR = 0.01;        // Fraction
 
 
 
@@ -88,39 +91,50 @@ public class ParticleHistoryTask implements RunnableFuture {
             // While the particle is inside this plasma
             while (plasma.getIsInside(particle.getPosition()) && particle.getE() >  ENERGY_CUTOFF) {
 
-                // We need to know where we are relative to the plasma boundary
-                // In order to use our stopping power function which is defined in normalized r
-                Vector3D position = particle.getPosition();
-
-                SphericalCoordinates coordinates = new SphericalCoordinates(position);
-
-                // Apache is in Math notation whilst we're in Physics notation
-                double theta = coordinates.getPhi();
-                double phi = coordinates.getTheta();
-
-                double r = position.getNorm() / plasma.getRadiusBound(theta, phi);      // Normalized r
-
-
-                // DEBUG MODE LINE
-                if (debugMode){
-                    System.out.printf("    %d: rx = %+.4e cm, ry = %+.4e cm, rz = %+.4e cm, E = %+.4e MeV\n",
-                            totalSteps, position.getX(), position.getY(), position.getZ(), particle.getE());
-                }
-
-
-                // Grab all of the plasma quantities at this position
-                double nD = plasma.getDeuteronNumberDensity(particle.getPosition());
-                double sigma = 1e-24 * crossSection.evaluate(particle, backgroundDeuteron);
-                double dEdx = stoppingPower.value(particle.getE(), r);
-
+                // Parameters at the starting point
+                double r1 = getNormalizedRadius(particle);
+                double E1 = particle.getE();
+                double dEdx1 = stoppingPower.value(E1, r1);
 
                 // If the particle is losing a significant amount of energy, we need to take smaller steps
-                dx = Math.min(dx, -energyToLose / dEdx / NUM_STEPS_PER_SYSTEM_SIZE);
+                dx = Math.min(dx, -energyToLose / dEdx1 / NUM_STEPS_PER_SYSTEM_SIZE);
 
+                // Attempt to step and verify we're still in the plasma
+                Particle steppedParticle = particle.step(dx, dEdx1);
+                if (!plasma.getIsInside(steppedParticle.getPosition())){
+                    break;
+                }
+
+                // Parameters at the destination point
+                double r2 = getNormalizedRadius(steppedParticle);
+                double E2 = steppedParticle.getE();
+                double dEdx2 = stoppingPower.value(E2, r2);
+
+                // Use trapezoidal method to iterate onto the particle's final energy
+                double energyError = Double.MAX_VALUE;
+                while (energyError > ACCEPTABLE_ENERGY_ERROR){
+                    double averageStopping = 0.5*(dEdx1 + dEdx2);
+                    steppedParticle = particle.step(dx, averageStopping);
+
+                    double newEnergy = steppedParticle.getE();
+                    energyError = FastMath.abs(newEnergy - E2)/E2;
+                    E2 = newEnergy;
+                    dEdx2 = stoppingPower.value(E2, r2);
+                }
+
+                // Grab the average deuteron number density between these two positions
+                double nD1 = plasma.getDeuteronNumberDensity(particle.getPosition());
+                double nD2 = plasma.getDeuteronNumberDensity(steppedParticle.getPosition());
+                double nD = 0.5*(nD1 + nD2);
+
+                // Grab the average cross section between these two positions
+                double sigma1 = 1e-24 * crossSection.evaluate(particle, backgroundDeuteron);
+                double sigma2 = 1e-24 * crossSection.evaluate(steppedParticle, backgroundDeuteron);
+                double sigma = 0.5*(sigma1 + sigma2);
 
                 // Calculate the reaction probability
                 historyReactionProbability += nD * sigma * dx * (1 - historyReactionProbability);
-                particle.step(dx, dEdx);
+                particle = steppedParticle;
 
                 totalSteps++;
             }
@@ -129,9 +143,40 @@ public class ParticleHistoryTask implements RunnableFuture {
         reactionProbability /= numParticles;
     }
 
+    /**
+     * Various getters
+     */
+
+    public Double getReactionProbability() {
+        return reactionProbability;
+    }
+
+
+    /**
+     * Private convenience methods
+     */
+
+    private double getNormalizedRadius(Particle particle){
+        Vector3D position = particle.getPosition();
+
+        SphericalCoordinates coordinates = new SphericalCoordinates(position);
+
+        // Apache is in Math notation whilst we're in Physics notation
+        double theta = coordinates.getPhi();
+        double phi = coordinates.getTheta();
+
+        // Position and energy at our starting point
+        return position.getNorm() / plasma.getRadiusBound(theta, phi);
+    }
+
+
+    /**
+     * Inherited methods that we don't currently use
+     */
+
     @Override
     public Object get() throws InterruptedException, ExecutionException {
-        return this.reactionProbability;
+        return null;
     }
 
     @Override
@@ -148,8 +193,6 @@ public class ParticleHistoryTask implements RunnableFuture {
     public boolean isDone() {
         return this.reactionProbability == null;
     }
-
-
 
     @Override
     public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {

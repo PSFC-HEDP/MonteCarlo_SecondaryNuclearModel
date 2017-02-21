@@ -53,7 +53,7 @@ public class Model {
         for (int i = 0; i < numCPUs; i ++){
             try {
                 threads[i].join();
-                yieldRatio += (double) tasks[i].get();
+                yieldRatio += tasks[i].getReactionProbability();
 
             }catch (Exception e){
                 e.printStackTrace();
