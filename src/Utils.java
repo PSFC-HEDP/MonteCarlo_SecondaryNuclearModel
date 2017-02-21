@@ -1,5 +1,3 @@
-import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
-import org.apache.commons.math3.stat.descriptive.summary.Sum;
 
 /**
  * Created by lahmann on 2016-06-15.
