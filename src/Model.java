@@ -30,8 +30,8 @@ public class Model {
 
     public double getYieldRatio(int totalParticles){
 
-        int numCPUs = Runtime.getRuntime().availableProcessors();
-        //int numCPUs = 1;
+        //int numCPUs = Runtime.getRuntime().availableProcessors();
+        int numCPUs = 1;
         int totalPerThread = (int) Math.ceil((double) totalParticles / numCPUs);
 
         Thread[] threads = new Thread[numCPUs];

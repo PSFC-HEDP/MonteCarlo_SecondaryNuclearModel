@@ -101,7 +101,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
                 // Attempt to step and verify we're still in the plasma
                 Particle steppedParticle = particle.step(dx, dEdx1);
-                if (!plasma.getIsInside(steppedParticle.getPosition())){
+                if (!plasma.getIsInside(steppedParticle.getPosition()) || steppedParticle.getE() < ENERGY_CUTOFF){
                     break;
                 }
 
@@ -117,6 +117,8 @@ public class ParticleHistoryTask implements RunnableFuture {
                     steppedParticle = particle.step(dx, averageStopping);
 
                     double newEnergy = steppedParticle.getE();
+                    if (newEnergy < ENERGY_CUTOFF)  break;
+
                     energyError = FastMath.abs(newEnergy - E2)/E2;
                     E2 = newEnergy;
                     dEdx2 = stoppingPower.value(E2, r2);
