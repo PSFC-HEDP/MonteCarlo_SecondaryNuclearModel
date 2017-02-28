@@ -12,7 +12,7 @@ public class Model {
 
     // Constants used when generating the stopping power function
     final double MINIMUM_STOPPING_POWER_ENERGY = ParticleHistoryTask.ENERGY_CUTOFF;       // MeV
-    final int NUM_ENERGY_NODES = 50;
+    final int NUM_ENERGY_NODES = 200;
 
     private ParticleDistribution testParticleDistribution;
     private BicubicInterpolatingFunction stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
@@ -30,8 +30,8 @@ public class Model {
 
     public double getYieldRatio(int totalParticles){
 
-        //int numCPUs = Runtime.getRuntime().availableProcessors();
-        int numCPUs = 1;
+        int numCPUs = Runtime.getRuntime().availableProcessors();
+        //int numCPUs = 1;
         int totalPerThread = (int) Math.ceil((double) totalParticles / numCPUs);
 
         Thread[] threads = new Thread[numCPUs];

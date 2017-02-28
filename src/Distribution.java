@@ -36,6 +36,10 @@ public class Distribution {
         return new Distribution(nodes, probabilities);
     }
 
+    static Distribution deltaFunction(double value){
+        return normDistribution(value, 1e-10*value);
+    }
+
 
 
     /**
