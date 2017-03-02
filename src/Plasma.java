@@ -1,5 +1,6 @@
 import cStopPow.DoubleVector;
 import cStopPow.StopPow_LP;
+import cStopPow.StopPow_Zimmerman;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
@@ -216,21 +217,13 @@ public class Plasma {
                 speciesTs.add(Ti);
             }
 
-            // Zimmerman stopping does NOT require electrons to be provided
             //StopPow_Zimmerman stopPow_zimmerman = new StopPow_Zimmerman(testParticle.getA(), testParticle.getZ(),
             //        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
-            //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx(testParticle.getE());
-
-
-            // Li-Petrasso requires we add the electrons explicitly
-            speciesZs.add(-1.0);
-            speciesAs.add(1.0 / 1836.0);
-            speciesTs.add(Te);
-            speciesNs.add(ne);
+            //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getE());
 
             StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getA(), testParticle.getZ(),
-                    speciesAs, speciesZs, speciesTs, speciesNs);
-            dEdx[i] = 1e4 * stopPow_lp.dEdx(testParticle.getE());
+                    speciesAs, speciesZs, speciesTs, speciesNs, Te);
+            dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(testParticle.getE());
         }
 
         return dEdx;

@@ -41,6 +41,13 @@ public class Particle {
         this.A = A;
     }
 
+    public Particle clone(){
+        Particle particle = new Particle(this.getE(), this.getZ(), this.getA());
+        particle.setPosition(this.getPosition());
+        particle.setDirection(this.getDirection());
+        return particle;
+    }
+
 
     /**
      * Setters

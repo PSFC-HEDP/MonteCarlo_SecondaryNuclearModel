@@ -58,8 +58,6 @@ public class Distribution {
 
         // Set the probability functions
         probability = new LinearInterpolator().interpolate(nodes, normalize(frequencies));
-        inverseCumulativeProbability = new LinearInterpolator().interpolate(cumulativeProbabilities, nodes);
-
     }
 
 
@@ -93,6 +91,19 @@ public class Distribution {
 
     public double[] getNodes() {
         return probability.getKnots();
+    }
+
+    public String toString(){
+        String string = "   Nodes   |    pdf     |    cdf\n";
+
+        double[] cumulativeProbValues = inverseCumulativeProbability.getKnots();
+        for (double cumulativeProbValue : cumulativeProbValues){
+            double node = inverseCumulativeProbability.value(cumulativeProbValue);
+            double prob = probability.value(node);
+            string += String.format("%.4e | %.4e | %.4e\n", node, prob, cumulativeProbValue);
+        }
+
+        return string;
     }
 
     /**

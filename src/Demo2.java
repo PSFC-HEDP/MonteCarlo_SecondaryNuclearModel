@@ -18,15 +18,15 @@ public class Demo2 {
         File cStopPowFile = new File("src/cStopPow/cStopPow.DLL");       // Windows
         System.load(cStopPowFile.getAbsolutePath());
 
-        testModel(1e-4*135, 8.5);
+        testModel(1e-4*300, 8.5, 0.05);
 
 
 
     }
 
-    public static void testModel(double P0, double burnT) {
+    public static void testModel(double P0, double burnT, double TeFraction) {
 
-        final int NUM_PARTICLES = (int) 5e4;
+        final int NUM_PARTICLES = (int) 2e4;
         final double TOTAL_MASS = getN170212_003TotalMass();
         final Vector3D LOCATION = new Vector3D(52.0, 0.0, 0.0);
 
@@ -34,7 +34,7 @@ public class Demo2 {
         /**
          * Make the helium-3 plasma
          */
-        Plasma uniformPlasma = Plasma.uniformPlasma(P0, TOTAL_MASS, burnT);
+        Plasma uniformPlasma = Plasma.uniformPlasma(P0, TOTAL_MASS, burnT, TeFraction);
         uniformPlasma.addHelium3Species(1.0);
 
         System.out.println(1000* P0 * uniformPlasma.getMassDensity(new Vector3D(0, 0 ,0)));

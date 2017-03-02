@@ -11,7 +11,7 @@ import org.apache.commons.math3.util.FastMath;
 public class FiniteSourceModel {
 
     // Constants used when generating the stopping power function
-    final double MINIMUM_STOPPING_POWER_ENERGY = ParticleHistoryTask.ENERGY_CUTOFF;       // MeV
+    final double MINIMUM_STOPPING_POWER_ENERGY = Utils.MINIMUM_LI_PETRASSO_ENERGY_MeV;       // MeV
     final int NUM_ENERGY_NODES = 200;
 
 

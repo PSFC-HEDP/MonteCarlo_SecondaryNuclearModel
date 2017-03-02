@@ -10,12 +10,8 @@ import org.apache.commons.math3.analysis.interpolation.*;
  */
 public class Model {
 
-    // Constants used when generating the stopping power function
-    final double MINIMUM_STOPPING_POWER_ENERGY = ParticleHistoryTask.ENERGY_CUTOFF;       // MeV
-    final int NUM_ENERGY_NODES = 200;
-
     private ParticleDistribution testParticleDistribution;
-    private BicubicInterpolatingFunction stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
+    private StoppingPowerModel stoppingPower;
     private CrossSection crossSection;
     private Plasma plasma;
 
@@ -25,7 +21,7 @@ public class Model {
         this.testParticleDistribution = testParticleDistribution;
         this.crossSection = crossSection;
         this.plasma = plasma;
-        this.stoppingPower = calculateStoppingPowerFunction();
+        this.stoppingPower = new StoppingPowerModel(testParticleDistribution, plasma);
     }
 
     public double getYieldRatio(int totalParticles){
@@ -61,21 +57,6 @@ public class Model {
         }
 
         return yieldRatio/numCPUs;
-    }
-
-    private BicubicInterpolatingFunction calculateStoppingPowerFunction(){
-
-        final double maxEnergy = testParticleDistribution.getMaxEnergy();
-        double[] energyNodes = Utils.linspace(MINIMUM_STOPPING_POWER_ENERGY, maxEnergy, NUM_ENERGY_NODES);
-        double[] radiusNodes = plasma.getRadiusNodes();
-
-        double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
-        for (int i = 0; i < energyNodes.length; i++){
-            Particle p = new Particle(energyNodes[i], testParticleDistribution.getZ(), testParticleDistribution.getA());
-            dEdx[i] = plasma.getStoppingPower(p);
-        }
-
-        return new BicubicInterpolator().interpolate(energyNodes, radiusNodes, dEdx);
     }
 
 }

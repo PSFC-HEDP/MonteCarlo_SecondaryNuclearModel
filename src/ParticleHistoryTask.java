@@ -14,7 +14,7 @@ import java.util.concurrent.TimeoutException;
 public class ParticleHistoryTask implements RunnableFuture {
 
     private CrossSection crossSection;
-    private BicubicInterpolatingFunction stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
+    private StoppingPowerModel stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
     private ParticleDistribution particleDistribution;
     private Plasma plasma;
     private int numParticles;
@@ -26,15 +26,15 @@ public class ParticleHistoryTask implements RunnableFuture {
     /**
      * Step parameters
      */
-    private final int NUM_STEPS_PER_SYSTEM_SIZE = 200;
+    private final int MIN_NUM_STEPS = 200;
 
-    static final double ENERGY_CUTOFF = 0.01;                   // MeV
-    private final double ACCEPTABLE_ENERGY_ERROR = 0.01;        // Fraction
+    private final double ACCEPTABLE_ENERGY_ERROR   = 1e-3;      // Fraction
+    private final double ACCEPTABLE_DISTANCE_ERROR = 1e-3;      // Fraction
 
 
 
     public ParticleHistoryTask(CrossSection crossSection, ParticleDistribution particleDistribution, Plasma plasma,
-                               BicubicInterpolatingFunction stoppingPower, int numParticles) {
+                               StoppingPowerModel stoppingPower, int numParticles) {
         this.crossSection = crossSection;
         this.particleDistribution = particleDistribution;
         this.plasma = plasma;
@@ -49,29 +49,21 @@ public class ParticleHistoryTask implements RunnableFuture {
     @Override
     public void run() {
 
-        // Determining a step size is non-trivial since our plasma could be any shape with any profiles
-        // A cheap calculation we can do is to take the plasmaBound R(theta = 0, phi = 0) to be somewhat
-        // representative of the system size and take our step size to be some fraction of that.
-        // This approximation SHOULD hold for plasmas with relatively small low mode asymmetries
-        // High amplitude and/or high mode asymmetries have the potential to break this
-
-        double plasmaBound = plasma.getRadiusBound(0.0, 0.0);
-        double dx = plasmaBound / NUM_STEPS_PER_SYSTEM_SIZE;
-
-
-        // In reality we should be sampling these from some thermal distribution
-        // Doing this assumes that those effects would be small
-        // (i.e E ~ 0 relative to the energy of the particles we're tracking)
-
-        Particle backgroundDeuteron = Particle.deuteron(0.0);
-
-
         for (int i = 0; i < numParticles; i++) {
 
-            int totalSteps = 0;
-            double historyReactionProbability = 0.0;
+            // Sample a particle
             Particle particle = particleDistribution.sample(plasma);
-            double energyToLose = particle.getE() - ENERGY_CUTOFF;
+
+            // Determine how far this particle needs to travel
+            double distance = getDistanceToPlasmaBoundary(particle);
+
+            // Calculate a step size
+            double dx = distance / MIN_NUM_STEPS;
+
+            // Initialize some variables we'll need
+            int totalSteps = 0;                             // This is for debugging only
+            double historyReactionProbability = 0.0;
+            double initialEnergy = particle.getE();
 
 
             // DEBUG MODE LINE
@@ -89,39 +81,42 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
             // While the particle is inside this plasma
-            while (plasma.getIsInside(particle.getPosition()) && particle.getE() >  ENERGY_CUTOFF) {
+            while (distance > dx && particle.getE() >  0.0) {
 
                 // Parameters at the starting point
                 double r1 = getNormalizedRadius(particle);
                 double E1 = particle.getE();
-                double dEdx1 = stoppingPower.value(E1, r1);
+                double dEdx1 = stoppingPower.evaluate(E1, r1);
 
                 // If the particle is losing a significant amount of energy, we need to take smaller steps
-                dx = Math.min(dx, -energyToLose / dEdx1 / NUM_STEPS_PER_SYSTEM_SIZE);
+                dx = Math.min(dx, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
 
-                // Attempt to step and verify we're still in the plasma
-                Particle steppedParticle = particle.step(dx, dEdx1);
-                if (!plasma.getIsInside(steppedParticle.getPosition()) || steppedParticle.getE() < ENERGY_CUTOFF){
-                    break;
-                }
+                // Calculate r2 before the energy loop to save time
+                double r2 = getNormalizedRadius(particle.step(dx, 0.0));
 
-                // Parameters at the destination point
-                double r2 = getNormalizedRadius(steppedParticle);
-                double E2 = steppedParticle.getE();
-                double dEdx2 = stoppingPower.value(E2, r2);
 
                 // Use trapezoidal method to iterate onto the particle's final energy
+                double E2 = E1;
+                double dEdx2 = dEdx1;
+                Particle steppedParticle = particle;
                 double energyError = Double.MAX_VALUE;
+
                 while (energyError > ACCEPTABLE_ENERGY_ERROR){
                     double averageStopping = 0.5*(dEdx1 + dEdx2);
                     steppedParticle = particle.step(dx, averageStopping);
 
                     double newEnergy = steppedParticle.getE();
-                    if (newEnergy < ENERGY_CUTOFF)  break;
+
+                    // If we've hit a negative energy, we need to take a smaller step size
+                    if (newEnergy < 0.0){
+                        newEnergy = 0.0;
+                        dx = -E1 / averageStopping;
+                        r2 = getNormalizedRadius(particle.step(dx, 0.0));
+                    }
 
                     energyError = FastMath.abs(newEnergy - E2)/E2;
                     E2 = newEnergy;
-                    dEdx2 = stoppingPower.value(E2, r2);
+                    dEdx2 = stoppingPower.evaluate(E2, r2);
                 }
 
                 // Grab the average deuteron number density between these two positions
@@ -129,16 +124,29 @@ public class ParticleHistoryTask implements RunnableFuture {
                 double nD2 = plasma.getDeuteronNumberDensity(steppedParticle.getPosition());
                 double nD = 0.5*(nD1 + nD2);
 
+
+                // Grab the average ion temperature between these two positions
+                double Ti1 = plasma.getIonTemperature(particle.getPosition());
+                double Ti2 = plasma.getIonTemperature(steppedParticle.getPosition());
+                double Ti = 0.5*(Ti1 + Ti2);
+
+
+                // Create a deuteron who's energy in T_ion
+                Particle backgroundDeuteron = Particle.deuteron(1e-3*Ti);
+
+
                 // Grab the average cross section between these two positions
                 double sigma1 = 1e-24 * crossSection.evaluate(particle, backgroundDeuteron);
                 double sigma2 = 1e-24 * crossSection.evaluate(steppedParticle, backgroundDeuteron);
                 double sigma = 0.5*(sigma1 + sigma2);
+
 
                 // Calculate the reaction probability
                 historyReactionProbability += nD * sigma * dx * (1 - historyReactionProbability);
                 particle = steppedParticle;
 
                 totalSteps++;
+                distance -= dx;
             }
             reactionProbability += historyReactionProbability;
         }
@@ -169,6 +177,48 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         // Position and energy at our starting point
         return position.getNorm() / plasma.getRadiusBound(theta, phi);
+    }
+
+    private double getDistanceToPlasmaBoundary(Particle particle){
+
+        // Create a clone that we'll use for the calculation
+        Particle tempParticle = particle.clone();
+
+        // We need some kind of guess of what the step size should be to get started
+        double plasmaBound = plasma.getRadiusBound(0.0, 0.0);
+        double dx = plasmaBound / MIN_NUM_STEPS;
+
+        // Step our particle until we're no longer in the plasma
+        double distance = 0.0;
+        while (plasma.getIsInside(tempParticle.getPosition())){
+            tempParticle = tempParticle.step(dx, 0.0);
+            distance += dx;
+        }
+
+        // Step back into the plasma
+        tempParticle = tempParticle.step(-dx, 0.0);
+        distance -= dx;
+
+
+        // Bisection method the refine our distance calculation
+        double distanceError = Double.MAX_VALUE;
+        while (distanceError > ACCEPTABLE_DISTANCE_ERROR){
+            dx /= 2;
+            tempParticle = tempParticle.step(dx, 0.0);
+
+
+            // To avoid "out of bound" errors, it's very important that we always stay inside the plasma
+            // As a result, we'll always underestimate the TRUE distance. Never overestimate
+            if (plasma.getIsInside(tempParticle.getPosition())){
+                double newDistance = distance + dx;
+                distanceError = FastMath.abs(newDistance - distance)/distance;
+                distance = newDistance;
+            }else{
+                tempParticle = tempParticle.step(-dx, 0.0);    // Undo the previous step
+            }
+        }
+
+        return distance;
     }
 
 

@@ -12,6 +12,8 @@ public class Utils {
     public static final double DD_n_birthEnergy_MeV   = 2.45;
     public static final double DD_3He_birthEnergy_MeV = 0.82;
 
+    public static final double MINIMUM_LI_PETRASSO_ENERGY_MeV = 0.01;
+
 
     public static final String D3He_ENDF_XS_FILE = "./data/d3He_BoschHale.dat";
     public static final String DT_ENDF_XS_FILE   = "./data/dT_BoschHale.dat";
