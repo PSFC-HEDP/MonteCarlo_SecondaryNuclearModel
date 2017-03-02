@@ -58,6 +58,7 @@ public class Distribution {
 
         // Set the probability functions
         probability = new LinearInterpolator().interpolate(nodes, normalize(frequencies));
+        inverseCumulativeProbability = new LinearInterpolator().interpolate(cumulativeProbabilities, nodes);
     }
 
 
