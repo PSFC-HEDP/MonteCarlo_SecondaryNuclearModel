@@ -6,9 +6,7 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
  */
 public class ParticleDistribution {
 
-    private int A;      // Mass number of Particles in this Distribution
-    private int Z;      // Atomic number of Particles in the Distribution
-
+    private ParticleType type;                      // Particle type in this Distribution
     private Distribution radialDistribution;        // Normalized radius distribution [0,1]
     private Distribution energyDistribution;        // Energy Distribution in MeV
 
@@ -18,41 +16,57 @@ public class ParticleDistribution {
      * Built in pre-defined particle distributions
      */
 
+    // D + D -> T + p
     public static ParticleDistribution ThermalDDtDistribution(Distribution radialDistribution, double temperature){
 
         temperature *= 1e-3;                                                            // keV -> MeV
 
-        double Q = (Utils.DD_T_birthEnergy_MeV + Utils.DD_p_birthEnergy_MeV);           // Q values in keV
-        double mu = Utils.DD_T_birthEnergy_MeV;                                         // Mean birth energy (MeV)
-        double factor = 2.0 * (3.0*1.0) / (3.0+1.0) / (2.0+2.0);                        // Factor = 2 (mC*mD) / (mC+mD) / (mA+mB)
-        double sigma = Math.sqrt(factor * Q * temperature);                             // Spectral width (keV)
+        double factor = 2.0;                                                            // Factor = 2 (mC*mD) / (mC+mD) / (mA+mB)
+        factor *= ParticleType.proton.getMass();
+        factor *= ParticleType.triton.getMass();
+        factor /= (ParticleType.proton.getMass() + ParticleType.triton.getMass());
+        factor /= (ParticleType.deuteron.getMass() + ParticleType.deuteron.getMass());
+
+        double Q = Constants.DDp_energyRelease;                                         // Q values in MeV
+        double mu = Constants.DD_T_birthEnergy_MeV  ;                                   // Mean birth energy (MeV)
+        double sigma = Math.sqrt(factor * Q * temperature);                             // Spectral width (MeV)
 
         Distribution energyDistribution = Distribution.normDistribution(mu, sigma);
-        return new ParticleDistribution(1, 3, radialDistribution, energyDistribution);
+        return new ParticleDistribution(ParticleType.triton, radialDistribution, energyDistribution);
     }
 
+    // D + D -> 3He + n
     public static ParticleDistribution ThermalDD3HeDistribution(Distribution radialDistribution, double temperature){
 
         temperature *= 1e-3;                                                            // keV -> MeV
 
-        double Q = (Utils.DD_3He_birthEnergy_MeV + Utils.DD_n_birthEnergy_MeV);         // Q values in keV
-        double mu = Utils.DD_3He_birthEnergy_MeV;                                       // Mean birth energy (MeV)
-        double factor = 2.0 * (3.0*1.0) / (3.0+1.0) / (2.0+2.0);                        // Factor = 2 (mC*mD) / (mC+mD) / (mA+mB)
-        double sigma = Math.sqrt(factor * Q * temperature);                             // Spectral width (keV)
+        double factor = 2.0;                                                            // Factor = 2 (mC*mD) / (mC+mD) / (mA+mB)
+        factor *= ParticleType.neutron.getMass();
+        factor *= ParticleType.helium3.getMass();
+        factor /= (ParticleType.neutron.getMass() + ParticleType.helium3.getMass());
+        factor /= (ParticleType.deuteron.getMass() + ParticleType.deuteron.getMass());
+
+        double Q = Constants.DDn_energyRelease;                                         // Q values in MeV
+        double mu = Constants.DD_3He_birthEnergy_MeV;                                   // Mean birth energy (MeV)
+        double sigma = Math.sqrt(factor * Q * temperature);                             // Spectral width (MeV)
 
         Distribution energyDistribution = Distribution.normDistribution(mu, sigma);
-        return new ParticleDistribution(2, 3, radialDistribution, energyDistribution);
+        return new ParticleDistribution(ParticleType.helium3, radialDistribution, energyDistribution);
     }
+
+
 
 
     /**
      * Constructors
      */
 
-    public ParticleDistribution(int Z, int A,  Distribution radialDistribution, Distribution energyDistribution) {
-        this.Z = Z;
-        this.A = A;
+    public ParticleDistribution(int Z, double mass,  Distribution radialDistribution, Distribution energyDistribution) {
+        this(new ParticleType(Z, mass), radialDistribution, energyDistribution);
+    }
 
+    public ParticleDistribution(ParticleType type, Distribution radialDistribution, Distribution energyDistribution) {
+        this.type = type;
         this.radialDistribution = radialDistribution;
         this.energyDistribution = energyDistribution;
     }
@@ -65,14 +79,8 @@ public class ParticleDistribution {
 
     public Particle sample(Plasma plasma){
 
-        Particle particle = new Particle(energyDistribution.sample(), this.Z, this.A);
-
-        // Sample a random position vector (we'll ignore the magnitude)
-        double dx = Math.random() - 0.5;
-        double dy = Math.random() - 0.5;
-        double dz = Math.random() - 0.5;
-
-        Vector3D position = new Vector3D(dx, dy, dz).normalize();
+        // Sample the position
+        Vector3D position = sampleRandomNormalizedVector();
 
         // Convert it to spherical
         SphericalCoordinates coordinates = new SphericalCoordinates(position);
@@ -87,30 +95,54 @@ public class ParticleDistribution {
 
         // Rescale our position vector to this magnitude
         position = position.scalarMultiply(r);
-        particle.setPosition(position);
 
-        // Sample a random direction vector
-        dx = Math.random() - 0.5;
-        dy = Math.random() - 0.5;
-        dz = Math.random() - 0.5;
 
-        Vector3D direction = new Vector3D(dx, dy, dz).normalize();
-        particle.setDirection(direction);
+        // Sample the direction
+        Vector3D direction = sampleRandomNormalizedVector();
 
-        return particle;
+
+        // Sample the energy
+        double energy = energyDistribution.sample();
+
+        // Return the Particle Object
+        return new Particle(getZ(), getMass(), position, direction, energy);
     }
 
-    public int getA() {
-        return A;
+    public ParticleType getType() {
+        return type;
+    }
+
+    public double getMass() {
+        return type.getMass();
     }
 
     public int getZ() {
-        return Z;
+        return type.getZ();
     }
 
     public double getMaxEnergy(){
         double[] energyNodes = energyDistribution.getNodes();
         return energyNodes[energyNodes.length - 1];
+    }
+
+    public String toString(){
+        String string = "";
+        string += "         Radial Distribution        \n";
+        string += "------------------------------------\n";
+        string += radialDistribution.toString();
+        string += "\n";
+        string += "         Energy Distribution        \n";
+        string += "------------------------------------\n";
+        string += energyDistribution.toString();
+        return string;
+    }
+
+    private Vector3D sampleRandomNormalizedVector(){
+        double dx = Math.random() - 0.5;
+        double dy = Math.random() - 0.5;
+        double dz = Math.random() - 0.5;
+
+        return new Vector3D(dx, dy, dz).normalize();
     }
 
 }

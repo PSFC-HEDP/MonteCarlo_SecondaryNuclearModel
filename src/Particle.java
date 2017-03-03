@@ -5,53 +5,42 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
  */
 public class Particle {
 
+    private ParticleType type;        // This Particle's ID
+    private double weight = 1.0;
+
     private Vector3D position;        // Position vector of this Particle in cm
+    private Vector3D velocity;        // Velocity of this Particle in cm/s
     private Vector3D direction;       // Unit vector of the Particle's direction
-    private double  E;                // This Particle's energy in MeV
 
-    private int A;   // Particle mass number
-    private int Z;   // Particle atomic number
+    private double E;                 // This Particle's energy in MeV
 
 
 
-    /**
-     * Built in pre-defined particles
-     */
 
-    public static Particle deuteron(double E){
-        return new Particle(E, 1, 2);
+    public Particle(int Z, double mass, Vector3D position, Vector3D direction, double E) {
+        this(new ParticleType(Z, mass), position, direction, E);
     }
 
-    public static Particle triton(double E){
-        return new Particle(E, 1, 3);
-    }
-
-    public static Particle helium3(double E){
-        return new Particle(E, 2, 3);
-    }
-
-
-    /**
-     * Constructors
-     */
-
-    Particle(double E, int Z, int A) {
+    public Particle(ParticleType type, Vector3D position, Vector3D direction, double E) {
+        this.type = type;
+        this.position = position;
+        this.direction = direction;
         this.E = E;
-        this.Z = Z;
-        this.A = A;
     }
 
     public Particle clone(){
-        Particle particle = new Particle(this.getE(), this.getZ(), this.getA());
-        particle.setPosition(this.getPosition());
-        particle.setDirection(this.getDirection());
-        return particle;
+        return new Particle(type, position, direction, E);
     }
+
 
 
     /**
      * Setters
      */
+
+    public void setWeight(double weight) {
+        this.weight = weight;
+    }
 
     public void setPosition(Vector3D position) {
         this.position = position;
@@ -62,9 +51,27 @@ public class Particle {
     }
 
 
+
     /**
      * Getters
      */
+
+
+    public ParticleType getType() {
+        return type;
+    }
+
+    public double getMass() {
+        return type.getMass();
+    }
+
+    public int getZ() {
+        return type.getZ();
+    }
+
+    public double getWeight() {
+        return weight;
+    }
 
     public Vector3D getPosition() {
         return position;
@@ -74,17 +81,15 @@ public class Particle {
         return direction;
     }
 
+    public Vector3D getVelocity(){
+
+    }
+
     public double getE() {
         return E;
     }
 
-    public int getA() {
-        return A;
-    }
 
-    public int getZ() {
-        return Z;
-    }
 
     /**
      * Step this Particle some distance through a material with stopping power dEdx
@@ -94,12 +99,12 @@ public class Particle {
         Vector3D newPosition = this.position.add(distance, direction);
         double newEnergy = this.E + dEdx*distance;
 
-        Particle particle = new Particle(newEnergy, this.getZ(), this.getA());
-        particle.setPosition(newPosition);
-        particle.setDirection(this.getDirection());
-
-        return particle;
+        return new Particle(getType(), newPosition, getDirection(), newEnergy);
     }
 
+
+    /**
+     *
+     */
 
 }

@@ -177,7 +177,7 @@ public class Plasma {
      * These values are extremely sensitive to the energy of the test particle and will need to be regenerated
      * as the particle looses energy in this Plasma
      */
-    double[] getStoppingPower(Particle testParticle){
+    double[] getStoppingPower(ParticleType testParticle, double energy){
 
         double[] r = getRadiusNodes();                  // Normalized radius [0, 1]
         double[] dEdx = new double[r.length];           // Stopping power array
@@ -191,7 +191,6 @@ public class Plasma {
             double Ti  = ionTemperature.value(r[i]);        // Ion Temperature in keV
             double Te  = electronTemperature.value(r[i]);   // Electron Temperature in keV
             double n   = numberDensityFromRho(rho);         // Number density
-            double ne  = 0.0;                               // Electron density
 
             // Initialize the vectors for the stopping power model
             DoubleVector speciesZs = new DoubleVector();
@@ -202,17 +201,16 @@ public class Plasma {
 
             // Loop through all the plasma species
             for (PlasmaSpecies species : plasmaSpecies){
-                double fi = species.numberFraction;     // Number fraction
-                double ni = n * fi;                     // Ion Density
-                ne += ni * species.Z;                   // Add electrons to the electron density
+                double fi = species.getNumberFraction();    // Number fraction
+                double ni = n * fi;                         // Ion Density
 
-                double Zbar = 20*Math.sqrt(Ti);     // Using approximation for ionization from Drake
-                Zbar = Math.min(Zbar, species.Z);   // Zbar cannot exceed Z
+                double Zbar = 20*Math.sqrt(Ti);             // Using approximation for ionization from Drake
+                Zbar = Math.min(Zbar, species.getZ());      // Zbar cannot exceed Z
 
                 // Add values to the vectors
-                speciesZs.add(species.Z);
+                speciesZs.add(species.getZ());
                 speciesZbars.add(Zbar);
-                speciesAs.add(species.A);
+                speciesAs.add(species.getMass());
                 speciesNs.add(ni);
                 speciesTs.add(Ti);
             }
@@ -221,9 +219,9 @@ public class Plasma {
             //        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
             //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getE());
 
-            StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getA(), testParticle.getZ(),
+            StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getMass(), testParticle.getZ(),
                     speciesAs, speciesZs, speciesTs, speciesNs, Te);
-            dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(testParticle.getE());
+            dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(energy);
         }
 
         return dEdx;
@@ -233,6 +231,17 @@ public class Plasma {
         return massDensity.getKnots();
     }
 
+    public String toString(){
+        String string = " r (norm)  | rho (g/cc) |  Ti (keV)  |  Te (keV)\n";
+
+        double[] r = getRadiusNodes();
+        for (int i = 0; i < r.length; i++){
+            string += String.format("%.4e | %.4e | %.4e | %.4e\n", r[i], massDensity.value(r[i]),
+                    ionTemperature.value(r[i]), electronTemperature.value(r[i]));
+        }
+
+        return string;
+    }
 
 
     /**
@@ -303,8 +312,16 @@ public class Plasma {
         return Double.NaN;
     }
 
+    public double getReactivity(Vector3D r, Reactivity reactivity){
+        return reactivity.evaluate(getIonTemperature(r));
+    }
+
     public double getDDnReactivity(Vector3D r){
-        return Reactivity.DDn_Reactivity.evaluate(getIonTemperature(r));
+        return getReactivity(r, Reactivity.DDn_Reactivity);
+    }
+
+    public double getD3HepReactivity(Vector3D r){
+        return getReactivity(r, Reactivity.D3Hep_Reactivity);
     }
 
     public double getMassDensity(Vector3D position){
@@ -339,20 +356,20 @@ public class Plasma {
         return numberDensityFromRho(getMassDensity(r));
     }
 
-    public double getDeuteronNumberDensity(Vector3D r){
+    public double getSpeciesNumberDensity(Vector3D r, ParticleType type){
 
         double totalFraction = 0.0;         // Sum of all species number fractions (should be 1 nominally)
-        double deuteriumFraction = 0.0;     // Number fraction of deuterium atoms
+        double speciesFraction = 0.0;       // Number fraction of the specific species
 
         for (PlasmaSpecies species : plasmaSpecies){
-            totalFraction += species.numberFraction;
+            totalFraction += species.getNumberFraction();
 
-            if (species.A == 2 && species.Z == 1){
-                deuteriumFraction = species.numberFraction;
+            if (species.getType().equals(type)){
+                speciesFraction = species.getNumberFraction();
             }
         }
 
-        return getNumberDensity(r) * deuteriumFraction / totalFraction;
+        return getNumberDensity(r) * speciesFraction / totalFraction;
     }
 
     public boolean getIsInside(Vector3D r){
@@ -387,10 +404,20 @@ public class Plasma {
     }
 
     // Get average Tion weighted by rho^2 <sigmaV>
-    public double getDDnBurnAveragedIonTemperature(){
-        double numerator   = volumeIntegral("getMassDensity", "getMassDensity", "getDDnReactivity", "getIonTemperature");
-        double denominator = volumeIntegral("getMassDensity", "getMassDensity", "getDDnReactivity");
+
+    public double getBurnAveragedIonTemperature(String reactivityMethodName){
+        double numerator   = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName, "getIonTemperature");
+        double denominator = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName);
         return  numerator / denominator;
+
+    }
+
+    public double getDDnBurnAveragedIonTemperature(){
+        return getBurnAveragedIonTemperature("getDDnReactivity");
+    }
+
+    public double getD3HepBurnAveragedIonTemperature(){
+        return getBurnAveragedIonTemperature("getD3HepReactivity");
     }
 
 
@@ -402,9 +429,12 @@ public class Plasma {
         return getSpatialBurnDistribution(Reactivity.DDn_Reactivity);
     }
 
-
     Distribution getSpatialDDpBurnDistribution(){
         return getSpatialBurnDistribution(Reactivity.DDp_Reactivity);
+    }
+
+    Distribution getSpatialD3HepBurnDistribution(){
+        return getSpatialBurnDistribution(Reactivity.D3Hep_Reactivity);
     }
 
     Distribution getSpatialBurnDistribution(Reactivity reactivity){
@@ -443,13 +473,18 @@ public class Plasma {
         addLegendreMode(0, 0, unnormalizedP0);
     }
 
-    public void setTotalMass(double totalMass){
+    public void setTotalMass(double totalMass) {
         double multiplicativeFactor = totalMass / getTotalMass();
         multiplyMassDensityByScalar(multiplicativeFactor);
     }
 
     public void setDDnBurnAveragedIonTemperature(double burnT){
         double multiplicativeFactor = burnT / getDDnBurnAveragedIonTemperature();
+        multiplyIonTemperatureByScalar(multiplicativeFactor);
+    }
+
+    public void setD3HepBurnAveragedIonTemperature(double burnT){
+        double multiplicativeFactor = burnT / getD3HepBurnAveragedIonTemperature();
         multiplyIonTemperatureByScalar(multiplicativeFactor);
     }
 
@@ -605,13 +640,28 @@ public class Plasma {
      */
     class PlasmaSpecies {
 
-        int A, Z;
-        double numberFraction;
+        private ParticleType type;
+        private double numberFraction;
 
-        PlasmaSpecies(int a, int z, double numberFraction) {
-            A = a;
-            Z = z;
+        PlasmaSpecies(int Z, int A, double numberFraction) {
+            type = new ParticleType(Z, A);
             this.numberFraction = numberFraction;
+        }
+
+        public ParticleType getType() {
+            return type;
+        }
+
+        public double getZ(){
+            return type.getZ();
+        }
+
+        public double getMass(){
+            return type.getMass();
+        }
+
+        public double getNumberFraction() {
+            return numberFraction;
         }
     }
 
@@ -620,20 +670,20 @@ public class Plasma {
      * Private convenience methods
      */
 
-    private double getAbar(){
-        double Abar = 0.0;
+    private double getAverageMass(){
+        double averageMass = 0.0;
         double totalFraction = 0.0;
 
         for (PlasmaSpecies species : plasmaSpecies){
-            Abar += species.A * species.numberFraction;
+            averageMass += species.getMass() * species.numberFraction;
             totalFraction += species.numberFraction;
         }
 
-        return Abar / totalFraction;
+        return averageMass / totalFraction;
     }
 
     private double numberDensityFromRho(double rho){
-        return rho / (getAbar() * 1000 * Utils.protonMass_kg);
+        return rho / (getAverageMass() * 1000 * Constants.protonMass_kg);
     }
 
     private double volumeIntegral(String ... methodNames){

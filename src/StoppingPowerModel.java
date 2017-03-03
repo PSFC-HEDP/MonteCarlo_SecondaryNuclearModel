@@ -33,8 +33,7 @@ public class StoppingPowerModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 1; i < energyNodes.length; i++){
-            Particle p = new Particle(energyNodes[i], particleDistribution.getZ(), particleDistribution.getA());
-            dEdx[i] = plasma.getStoppingPower(p);
+            dEdx[i] = plasma.getStoppingPower(particleDistribution.getType(), energyNodes[i]);
         }
 
 

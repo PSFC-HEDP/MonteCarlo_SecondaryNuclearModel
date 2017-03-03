@@ -1,6 +1,9 @@
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Created by lahmann on 2017-02-27.
@@ -18,7 +21,7 @@ public class Demo2 {
         File cStopPowFile = new File("src/cStopPow/cStopPow.DLL");       // Windows
         System.load(cStopPowFile.getAbsolutePath());
 
-        testModel(1e-4*300, 8.5, 0.05);
+        testModel(1e-4*300, 8.5, 1.0);
 
 
 
@@ -26,18 +29,23 @@ public class Demo2 {
 
     public static void testModel(double P0, double burnT, double TeFraction) {
 
-        final int NUM_PARTICLES = (int) 2e4;
+        final int NUM_PARTICLES = (int) 5e4;
         final double TOTAL_MASS = getN170212_003TotalMass();
         final Vector3D LOCATION = new Vector3D(52.0, 0.0, 0.0);
+
+        // Relation from Maria (03-02-2017) using basic reactivity scaling based on the measured yield
+        //double P0 = 6.83088 * burnT * burnT - 28.7257 * burnT + 25.7562;        // in um
+        //P0 *= 1e-4;     // um -> cm
 
 
         /**
          * Make the helium-3 plasma
          */
-        Plasma uniformPlasma = Plasma.uniformPlasma(P0, TOTAL_MASS, burnT, TeFraction);
-        uniformPlasma.addHelium3Species(1.0);
+        //Plasma plasma = getN170212_003Plasma(P0, burnT, TeFraction);
+        Plasma plasma = Plasma.uniformPlasma(P0, TOTAL_MASS, burnT, TeFraction);
+        plasma.addHelium3Species(1.0);
 
-        System.out.println(1000* P0 * uniformPlasma.getMassDensity(new Vector3D(0, 0 ,0)));
+        //System.out.println(plasma);
 
 
         /**
@@ -45,26 +53,34 @@ public class Demo2 {
          */
         double temperatureSigmaMeV = 1e-3*Math.sqrt(burnT*5856.0);
 
-        Distribution hotSpotDistribution = Distribution.deltaFunction(1e-32);
-        Distribution uniformDistribution = uniformPlasma.getSpatialDDnBurnDistribution();
+        Distribution uniformDistribution = plasma.getSpatialDDnBurnDistribution();
         Distribution energyDistribution  = Distribution.normDistribution(14.7, temperatureSigmaMeV);
 
         ParticleDistribution particleDistribution = new ParticleDistribution(1, 1,
                 uniformDistribution, energyDistribution);
 
+        //System.out.println(particleDistribution);
+
 
         /**
          * Make the model
          */
-        FiniteSourceModel model = new FiniteSourceModel(particleDistribution, uniformPlasma, LOCATION);
+        FiniteSourceModel model = new FiniteSourceModel(particleDistribution, plasma, LOCATION);
         Particle[] particles = model.rangeParticles(NUM_PARTICLES);
 
 
         /**
          * Print results
          */
-        for (Particle particle : particles){
-            System.out.println(particle.getE());
+        try {
+            FileWriter w = new FileWriter(".\\temp.dat");
+            for (Particle particle : particles) {
+                w.write(particle.getE() + "\n");
+            }
+            w.close();
+        }
+        catch (Exception e){
+
         }
 
     }
@@ -87,6 +103,44 @@ public class Demo2 {
         double totalMass =  massDensity * volume;
 
         return totalMass;
+    }
+
+    private static Plasma getN170212_003Plasma(double P0, double burnT, double TeFraction){
+
+        try {
+            ArrayList<Double> massDensities = new ArrayList<>();
+            ArrayList<Double> temperatures = new ArrayList<>();
+
+            Scanner s = new Scanner(new File(".\\data\\LilacProfiles5.2atm70kJ_complete.txt"));
+
+            while (s.hasNext()){
+                s.next();
+                massDensities.add(s.nextDouble());
+                temperatures.add(1e-3*s.nextDouble());
+            }
+
+            double[] Ti = new double[temperatures.size()];
+            double[] Te = new double[temperatures.size()];
+            double[] rho = new double[massDensities.size()];
+            for (int i = 0; i < massDensities.size(); i++){
+                Ti[i] = temperatures.get(i);
+                Te[i] = Ti[i];
+                rho[i] = massDensities.get(i);
+            }
+
+            Plasma plasma = new Plasma(Ti, Te, rho);
+            plasma.setP0(P0);
+            plasma.setD3HepBurnAveragedIonTemperature(burnT);
+            plasma.setElectronTemperatureFraction(TeFraction);
+            plasma.setTotalMass(getN170212_003TotalMass());
+
+            return plasma;
+
+        }catch (Exception e){
+            e.printStackTrace();
+            System.exit(-1);
+            return null;
+        }
     }
 
 }

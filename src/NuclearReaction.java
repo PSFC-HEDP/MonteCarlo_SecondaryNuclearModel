@@ -9,17 +9,40 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
- * Created by lahmann on 2016-06-16.
+ * Handles a nuclear reaction // A + B -> C + D
  */
-public class CrossSection {
+public class NuclearReaction {
 
-    private PolynomialSplineFunction function;
+    private ParticleType reactantParticleA;
+    private ParticleType reactantParticleB;
 
-    public CrossSection(String dataFilename){
-        this(new File(dataFilename));
+    private ParticleType productParticleC;
+    private ParticleType productParticleD;
+
+    private double energyReleased;      // Q value
+
+    private PolynomialSplineFunction crossSection;
+
+    public NuclearReaction(ParticleType A, ParticleType B, ParticleType C, ParticleType D, double Q, File crossSectionFile) {
+        this.reactantParticleA = A;
+        this.reactantParticleB = B;
+        this.productParticleC = C;
+        this.productParticleD = D;
+        this.energyReleased = Q;
+
+        generateCrossSectionFunction(crossSectionFile);
     }
 
-    public CrossSection(File dataFile){
+    public Particle getProductParticleC(Particle A, Particle B){
+
+
+
+
+    }
+
+
+
+    private void generateCrossSectionFunction(File dataFile){
 
         ArrayList<Double> E = new ArrayList<>();
         ArrayList<Double> sig = new ArrayList<>();
@@ -38,36 +61,28 @@ public class CrossSection {
                 sigArray[i] = sig.get(i);
             }
 
-            function = new SplineInterpolator().interpolate(
-                    eArray, sigArray);
+            crossSection = new SplineInterpolator().interpolate(eArray, sigArray);
         }
         catch (IOException e){
             e.printStackTrace();
         }
     }
 
-    // TODO: This is currently assuming the limit v1 >> v2
-    public double evaluate(Particle p1, Particle p2){
+    private double getCrossSection(Particle p1, Particle p2){
         double centerMassEnergy = 0.0;
 
         centerMassEnergy += p1.getE() * p2.getA() / (double) (p1.getA() + p2.getA());
         centerMassEnergy += p2.getE() * p1.getA() / (double) (p1.getA() + p2.getA());
 
         try {
-            return function.value(centerMassEnergy);
+            return crossSection.value(centerMassEnergy);
         }catch (OutOfRangeException e){
-            double[] knots = function.getKnots();
+            double[] knots = crossSection.getKnots();
             centerMassEnergy = FastMath.max(centerMassEnergy, knots[0]);
             centerMassEnergy = FastMath.min(centerMassEnergy, knots[knots.length-1]);
-            return function.value(centerMassEnergy);
+            return crossSection.value(centerMassEnergy);
         }
     }
 
-    public static CrossSection dt(){
-        return new CrossSection(Utils.DT_ENDF_XS_FILE);
-    }
 
-    public static CrossSection d3He(){
-        return new CrossSection(Utils.D3He_ENDF_XS_FILE);
-    }
 }

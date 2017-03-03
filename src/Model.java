@@ -1,5 +1,3 @@
-import org.apache.commons.math3.analysis.interpolation.*;
-
 /**
  * Created by lahmann on 2016-06-19.
  *
