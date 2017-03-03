@@ -82,6 +82,7 @@ public class Demo {
         }
     }
 
+
     public static double[] runUniformModel(Plasma plasma, int numParticles) {
 
         // Create the particle distributions
@@ -92,8 +93,8 @@ public class Demo {
 
 
         // Create the models
-        Model neutronModel = new Model(tritons, CrossSection.dt(), plasma);
-        Model protonModel = new Model(helium3s, CrossSection.d3He(), plasma);
+        Model neutronModel = new Model(tritons, NuclearReaction.DTn, plasma);
+        Model protonModel = new Model(helium3s, NuclearReaction.D3Hep, plasma);
 
 
         // Run the models
@@ -116,8 +117,8 @@ public class Demo {
 
 
         // Create the models
-        Model neutronModel = new Model(tritons, CrossSection.dt(), plasma);
-        Model protonModel = new Model(helium3s, CrossSection.d3He(), plasma);
+        Model neutronModel = new Model(tritons, NuclearReaction.DTn, plasma);
+        Model protonModel = new Model(helium3s, NuclearReaction.D3Hep, plasma);
 
 
         // Run the models
@@ -130,6 +131,7 @@ public class Demo {
         return yieldRatios;
 
     }
+
 
 
 }

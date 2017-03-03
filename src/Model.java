@@ -10,22 +10,24 @@ public class Model {
 
     private ParticleDistribution testParticleDistribution;
     private StoppingPowerModel stoppingPower;
-    private CrossSection crossSection;
+    private NuclearReaction nuclearReaction;
     private Plasma plasma;
 
 
 
-    public Model(ParticleDistribution testParticleDistribution, CrossSection crossSection, Plasma plasma) {
+    public Model(ParticleDistribution testParticleDistribution, NuclearReaction nuclearReaction, Plasma plasma) {
         this.testParticleDistribution = testParticleDistribution;
-        this.crossSection = crossSection;
+        this.nuclearReaction = nuclearReaction;
         this.plasma = plasma;
         this.stoppingPower = new StoppingPowerModel(testParticleDistribution, plasma);
     }
 
     public double getYieldRatio(int totalParticles){
 
-        int numCPUs = Runtime.getRuntime().availableProcessors();
-        //int numCPUs = 1;
+        testParticleDistribution.setParticleWeight(1.0 / totalParticles);
+
+        //int numCPUs = Runtime.getRuntime().availableProcessors();
+        int numCPUs = 1;
         int totalPerThread = (int) Math.ceil((double) totalParticles / numCPUs);
 
         Thread[] threads = new Thread[numCPUs];
@@ -34,10 +36,10 @@ public class Model {
 
         for (int i = 0; i < numCPUs; i++){
             tasks[i] = new ParticleHistoryTask(
-                    crossSection, testParticleDistribution, plasma, stoppingPower, totalPerThread);
+                    nuclearReaction, testParticleDistribution, plasma, stoppingPower, totalPerThread);
 
             //tasks[i].setDebugMode(true);
-            //tasks[i].run();
+            tasks[i].run();
 
             threads[i] = new Thread(tasks[i]);
             threads[i].start();

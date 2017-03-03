@@ -75,7 +75,7 @@ public class Demo2 {
         try {
             FileWriter w = new FileWriter(".\\temp.dat");
             for (Particle particle : particles) {
-                w.write(particle.getE() + "\n");
+                w.write(particle.getEnergy() + "\n");
             }
             w.close();
         }

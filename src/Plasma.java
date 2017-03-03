@@ -1,6 +1,5 @@
 import cStopPow.DoubleVector;
 import cStopPow.StopPow_LP;
-import cStopPow.StopPow_Zimmerman;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
@@ -168,7 +167,14 @@ public class Plasma {
         this.addSpecies(1, 3, numberFraction);
     }
 
+    public boolean containsSpecies(ParticleType type){
 
+        for (PlasmaSpecies species : plasmaSpecies){
+            if (species.getType().equals(type))  return true;
+        }
+
+        return false;
+    }
 
     /**
      * Method that returns an array of values corresponding the the stopping power (dE/dx) of the testParticle
@@ -217,7 +223,7 @@ public class Plasma {
 
             //StopPow_Zimmerman stopPow_zimmerman = new StopPow_Zimmerman(testParticle.getA(), testParticle.getZ(),
             //        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
-            //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getE());
+            //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getEnergy());
 
             StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getMass(), testParticle.getZ(),
                     speciesAs, speciesZs, speciesTs, speciesNs, Te);
@@ -381,6 +387,8 @@ public class Plasma {
 
         return r.getNorm() < getRadiusBound(theta, phi);
     }
+
+
 
 
     /**
@@ -643,8 +651,12 @@ public class Plasma {
         private ParticleType type;
         private double numberFraction;
 
-        PlasmaSpecies(int Z, int A, double numberFraction) {
-            type = new ParticleType(Z, A);
+        PlasmaSpecies(int Z, double mass, double numberFraction) {
+            this(new ParticleType(Z, mass), numberFraction);
+        }
+
+        public PlasmaSpecies(ParticleType type, double numberFraction) {
+            this.type = type;
             this.numberFraction = numberFraction;
         }
 
@@ -683,7 +695,7 @@ public class Plasma {
     }
 
     private double numberDensityFromRho(double rho){
-        return rho / (getAverageMass() * 1000 * Constants.protonMass_kg);
+        return rho / (getAverageMass() * 1000 * Constants.PROTON_MASS_KG);
     }
 
     private double volumeIntegral(String ... methodNames){

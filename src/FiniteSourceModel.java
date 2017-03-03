@@ -56,15 +56,15 @@ public class FiniteSourceModel {
             double dx = plasmaBound / NUM_STEPS_PER_SYSTEM_SIZE;
 
 
-            double energyToLose = particle.getE() - ENERGY_CUTOFF;
+            double energyToLose = particle.getEnergy() - ENERGY_CUTOFF;
 
 
             // While the particle is inside this plasma
-            while (plasma.getIsInside(particle.getPosition()) && particle.getE() >  ENERGY_CUTOFF) {
+            while (plasma.getIsInside(particle.getPosition()) && particle.getEnergy() >  ENERGY_CUTOFF) {
 
                 // Parameters at the starting point
                 double r1 = getNormalizedRadius(particle);
-                double E1 = particle.getE();
+                double E1 = particle.getEnergy();
                 double dEdx1 = stoppingPower.value(E1, r1);
 
                 // If the particle is losing a significant amount of energy, we need to take smaller steps
@@ -72,13 +72,13 @@ public class FiniteSourceModel {
 
                 // Attempt to step and verify we're still in the plasma
                 Particle steppedParticle = particle.step(dx, dEdx1);
-                if (!plasma.getIsInside(steppedParticle.getPosition()) || steppedParticle.getE() < ENERGY_CUTOFF){
+                if (!plasma.getIsInside(steppedParticle.getPosition()) || steppedParticle.getEnergy() < ENERGY_CUTOFF){
                     break;
                 }
 
                 // Parameters at the destination point
                 double r2 = getNormalizedRadius(steppedParticle);
-                double E2 = steppedParticle.getE();
+                double E2 = steppedParticle.getEnergy();
                 double dEdx2 = stoppingPower.value(E2, r2);
 
                 // Use trapezoidal method to iterate onto the particle's final energy
@@ -87,7 +87,7 @@ public class FiniteSourceModel {
                     double averageStopping = 0.5*(dEdx1 + dEdx2);
                     steppedParticle = particle.step(dx, averageStopping);
 
-                    double newEnergy = steppedParticle.getE();
+                    double newEnergy = steppedParticle.getEnergy();
                     if (newEnergy < ENERGY_CUTOFF)  break;
 
                     energyError = FastMath.abs(newEnergy - E2)/E2;
@@ -112,8 +112,8 @@ public class FiniteSourceModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 0; i < energyNodes.length; i++){
-            Particle p = new Particle(energyNodes[i], testParticleDistribution.getZ(), testParticleDistribution.getA());
-            dEdx[i] = plasma.getStoppingPower(p);
+            //Particle p = new Particle(energyNodes[i], testParticleDistribution.getZ(), testParticleDistribution.getA());
+            //dEdx[i] = plasma.getStoppingPower(p);
         }
 
         return new BicubicInterpolator().interpolate(energyNodes, radiusNodes, dEdx);

@@ -1,3 +1,4 @@
+import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 /**
  * Created by lahmann on 2016-06-15.
@@ -36,6 +37,14 @@ public class Utils {
         }
 
         return nodes;
+    }
+
+    public static Vector3D sampleRandomNormalizedVector(){
+        double dx = Math.random() - 0.5;
+        double dy = Math.random() - 0.5;
+        double dz = Math.random() - 0.5;
+
+        return new Vector3D(dx, dy, dz).normalize();
     }
 
 }

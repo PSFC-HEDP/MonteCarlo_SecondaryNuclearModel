@@ -1,4 +1,5 @@
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
+import org.apache.commons.math3.util.FastMath;
 
 /**
  * Created by lahmann on 2016-06-15.
@@ -6,30 +7,43 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 public class Particle {
 
     private ParticleType type;        // This Particle's ID
-    private double weight = 1.0;
+    private double weight = 1.0;      // This Particle's statistical weight
 
     private Vector3D position;        // Position vector of this Particle in cm
-    private Vector3D velocity;        // Velocity of this Particle in cm/s
+    private Vector3D velocity;        // Velocity of this Particle as a fraction of the speed of light
     private Vector3D direction;       // Unit vector of the Particle's direction
 
-    private double E;                 // This Particle's energy in MeV
+    private double energy;             // This Particle's energy in MeV
 
 
 
 
-    public Particle(int Z, double mass, Vector3D position, Vector3D direction, double E) {
-        this(new ParticleType(Z, mass), position, direction, E);
+    public Particle(int Z, double mass, Vector3D position, Vector3D direction, double energy) {
+        this(new ParticleType(Z, mass), position, direction, energy);
     }
 
-    public Particle(ParticleType type, Vector3D position, Vector3D direction, double E) {
+    public Particle(ParticleType type, Vector3D position, Vector3D direction, double energy) {
         this.type = type;
         this.position = position;
         this.direction = direction;
-        this.E = E;
+        this.energy = energy;
+
+        double speed = FastMath.sqrt(2*energy/type.getMass()/Constants.MEV_PER_AMU);        // (v/c)
+        this.velocity = direction.scalarMultiply(speed);
+    }
+
+    public Particle(ParticleType type, double energy) {
+        this.type = type;
+        this.position = new Vector3D(0,0,0);
+        this.direction = Utils.sampleRandomNormalizedVector();
+        this.energy = energy;
+
+        double speed = FastMath.sqrt(2*energy/type.getMass()/Constants.MEV_PER_AMU);        // (v/c)
+        this.velocity = direction.scalarMultiply(speed);
     }
 
     public Particle clone(){
-        return new Particle(type, position, direction, E);
+        return new Particle(type, position, direction, energy);
     }
 
 
@@ -40,6 +54,10 @@ public class Particle {
 
     public void setWeight(double weight) {
         this.weight = weight;
+    }
+
+    public void multiplyWeight(double scalar){
+        this.weight *= scalar;
     }
 
     public void setPosition(Vector3D position) {
@@ -82,11 +100,11 @@ public class Particle {
     }
 
     public Vector3D getVelocity(){
-
+        return velocity;
     }
 
-    public double getE() {
-        return E;
+    public double getEnergy() {
+        return energy;
     }
 
 
@@ -97,7 +115,7 @@ public class Particle {
 
     public Particle step(double distance, double dEdx){
         Vector3D newPosition = this.position.add(distance, direction);
-        double newEnergy = this.E + dEdx*distance;
+        double newEnergy = this.energy + dEdx*distance;
 
         return new Particle(getType(), newPosition, getDirection(), newEnergy);
     }
