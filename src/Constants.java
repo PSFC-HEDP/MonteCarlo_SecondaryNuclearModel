@@ -52,6 +52,11 @@ public class Constants {
     public static final double DT_A_BIRTH_ENERGY_MEV = 3.5;
     public static final double DT_N_ENERGY_RELEASE = DT_N_BIRTH_ENERGY_MEV + DT_A_BIRTH_ENERGY_MEV;
 
+    // D + 3He -> p + a
+    public static final double D3HE_P_BIRTH_ENERGY_MEV = 14.7;
+    public static final double D3HE_A_BIRTH_ENERGY_MEV = 3.6;
+    public static final double D3HE_P_ENERGY_RELEASE = D3HE_P_BIRTH_ENERGY_MEV + D3HE_A_BIRTH_ENERGY_MEV;
+
 
 
 

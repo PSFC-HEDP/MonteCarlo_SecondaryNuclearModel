@@ -24,8 +24,8 @@ public class NuclearReaction {
 
     private PolynomialSplineFunction crossSection;
 
-    public static final NuclearReaction DTn   = new NuclearReaction(ParticleType.deuteron, ParticleType.triton, ParticleType.neutron, ParticleType.alpha, Constants.DD_T_BIRTH_ENERGY_MEV, Utils.DT_ENDF_XS_FILE);
-    public static final NuclearReaction D3Hep = new NuclearReaction(ParticleType.deuteron, ParticleType.triton, ParticleType.neutron, ParticleType.alpha, Constants.DD_T_BIRTH_ENERGY_MEV, Utils.D3He_ENDF_XS_FILE);
+    public static final NuclearReaction DTn   = new NuclearReaction(ParticleType.deuteron, ParticleType.triton, ParticleType.neutron, ParticleType.alpha, Constants.DT_N_ENERGY_RELEASE, Utils.DT_ENDF_XS_FILE);
+    public static final NuclearReaction D3Hep = new NuclearReaction(ParticleType.deuteron, ParticleType.helium3, ParticleType.proton, ParticleType.alpha, Constants.D3HE_P_ENERGY_RELEASE, Utils.D3He_ENDF_XS_FILE);
 
     public NuclearReaction(ParticleType A, ParticleType B, ParticleType C, ParticleType D, double Q, String crossSectionFile) {
         this.reactantParticleTypeA = A;
@@ -63,26 +63,43 @@ public class NuclearReaction {
 
 
         // Center of mass energy of the product of interest in MeV
-        double productCenterOfMassEnergy = (productOfInterest.getMass() / (productOfInterest.getMass() + otherProduct.getMass())) * (energyReleased + kineticEnergy);
+        double productEnergy_CoM = (otherProduct.getMass() / (productOfInterest.getMass() + otherProduct.getMass())) * (energyReleased + kineticEnergy);
 
         // Center of mass speed of the product of interest as a fraction of c
-        double productCenterOfMassSpeed = FastMath.sqrt(2*productCenterOfMassEnergy/productOfInterest.getMass()/Constants.MEV_PER_AMU);
+        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/productOfInterest.getMass()/Constants.MEV_PER_AMU);
+
+
+        /**
+         * How we would handle it if we didn't force the direction
+         */
+
+        //Vector3D productVelocity_CoM = Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
+        //Vector3D productVelocity_Lab = centerOfMassVelocity.add(productVelocity_CoM);
+        //double productSpeed_Lab = productVelocity_Lab.getNorm();
+        //double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+        //Particle productParticle = new Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab);
+
+
+        /**
+         * How we handle it when we DO force the direction
+         */
 
         // Angle between the center of mass velocity and the forced direction
         double angle = Vector3D.angle(centerOfMassVelocity, direction);
 
         // Use the law of cosines (based on vC = vCM + uC) to get the speed of the product as a fraction of c
-        double productLabSpeed = FastMath.pow(centerOfMassVelocity.getNorm(), 2);       // vCM^2
-        productLabSpeed *= FastMath.pow(FastMath.cos(angle),2) - 1;                     // vCM^2 * (cos^2(\theta) - 1)
-        productLabSpeed += FastMath.pow(productCenterOfMassSpeed,2);                    // uC^2 + vCM^2 * (cos^2(\theta) - 1)
-        productLabSpeed = FastMath.sqrt(productLabSpeed);                                  // \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
-        productLabSpeed += centerOfMassVelocity.getNorm()*FastMath.cos(angle);             // vCM * cos(\theta) + \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
+        double productSpeed_Lab = FastMath.pow(centerOfMassVelocity.getNorm(), 2);       // vCM^2
+        productSpeed_Lab *= FastMath.pow(FastMath.cos(angle),2) - 1;                     // vCM^2 * (cos^2(\theta) - 1)
+        productSpeed_Lab += FastMath.pow(productSpeed_CoM,2);                    // uC^2 + vCM^2 * (cos^2(\theta) - 1)
+        productSpeed_Lab = FastMath.sqrt(productSpeed_Lab);                                  // \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
+        productSpeed_Lab += centerOfMassVelocity.getNorm()*FastMath.cos(angle);             // vCM * cos(\theta) + \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
 
         // Convert this to an energy in MeV
-        double productLabEnergy = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productLabSpeed,2);        // MeV
+        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
-        Particle productParticle = new Particle(productOfInterest, A.getPosition(), direction, productLabEnergy);
+        Particle productParticle = new Particle(productOfInterest, A.getPosition(), direction, productEnergy_Lab);
 
         return productParticle;
     }

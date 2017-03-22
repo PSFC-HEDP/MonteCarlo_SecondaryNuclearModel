@@ -43,7 +43,9 @@ public class Particle {
     }
 
     public Particle clone(){
-        return new Particle(type, position, direction, energy);
+        Particle particle = new Particle(type, position, direction, energy);
+        particle.setWeight(weight);
+        return particle;
     }
 
 
@@ -68,7 +70,9 @@ public class Particle {
         this.direction = direction.normalize();
     }
 
-
+    public void setEnergy(double energy) {
+        this.energy = energy;
+    }
 
     /**
      * Getters
@@ -117,12 +121,30 @@ public class Particle {
         Vector3D newPosition = this.position.add(distance, direction);
         double newEnergy = this.energy + dEdx*distance;
 
-        return new Particle(getType(), newPosition, getDirection(), newEnergy);
+        Particle steppedParticle = this.clone();
+        steppedParticle.setPosition(newPosition);
+        steppedParticle.setEnergy(newEnergy);
+
+        return steppedParticle;
     }
 
+    public String toString(){
+        return String.format(
+                "Z = %d, M = %.4f\n" +
+                "weight = %+.4e\n" +
+                "rx = %+.4e cm, ry = %+.4e cm, rz = %+.4e cm\n" +
+                "dx = %+.4e   , dy = %+.4e   , dz = %+.4e   \n" +
+                "vx = %+.4e   , vy = %+.4e   , vz = %+.4e   \n" +
+                "E  = %+.4e MeV\n",
 
-    /**
-     *
-     */
+                type.getZ(), type.getMass(),
+                weight,
+                position.getX(), position.getY(), position.getZ(),
+                direction.getX(), direction.getY(), direction.getZ(),
+                velocity.getX(), velocity.getY(), velocity.getZ(),
+                energy
+        );
+
+    }
 
 }

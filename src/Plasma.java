@@ -151,20 +151,20 @@ public class Plasma {
         legendreModes.add(new LegendreMode(l, m, magnitude));
     }
 
-    void addSpecies(int Z, int A, double numberFraction){
-        plasmaSpecies.add(new PlasmaSpecies(A, Z, numberFraction));
+    void addSpecies(ParticleType type, double numberFraction){
+        plasmaSpecies.add(new PlasmaSpecies(type, numberFraction));
     }
 
     void addDeuteriumSpecies(double numberFraction){
-        this.addSpecies(1, 2, numberFraction);
+        this.addSpecies(ParticleType.deuteron, numberFraction);
     }
 
     void addHelium3Species(double numberFraction){
-        this.addSpecies(2, 3, numberFraction);
+        this.addSpecies(ParticleType.helium3, numberFraction);
     }
 
     void addTritiumSpecies(double numberFraction){
-        this.addSpecies(1, 3, numberFraction);
+        this.addSpecies(ParticleType.triton, numberFraction);
     }
 
     public boolean containsSpecies(ParticleType type){
