@@ -1,4 +1,7 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 /**
@@ -38,6 +41,22 @@ public class Utils {
         }
 
         return nodes;
+    }
+
+    public static double[] getSphericalFromVector(Vector3D vector){
+        SphericalCoordinates coordinates = new SphericalCoordinates(vector);
+
+        // Apache is in Math notation whilst we're in Physics notation
+        double r     = coordinates.getR();
+        double theta = coordinates.getPhi();
+        double phi   = coordinates.getTheta();
+
+        return new double[] {r, theta, phi};
+    }
+
+    public static Vector3D getVectorFromSpherical(double r, double theta, double phi){
+        // Apache is in Math notation whilst we're in Physics notation
+        return new SphericalCoordinates(r, phi, theta).getCartesian();
     }
 
     public static Vector3D sampleRandomNormalizedVector(){

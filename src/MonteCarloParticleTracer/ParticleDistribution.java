@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
@@ -7,9 +9,9 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 public class ParticleDistribution {
 
     private double particleWeight = 1.0;
-    private ParticleType type;                      // Particle type in this Distribution
+    private ParticleType type;                      // MonteCarloParticleTracer.Particle type in this MonteCarloParticleTracer.Distribution
     private Distribution radialDistribution;        // Normalized radius distribution [0,1]
-    private Distribution energyDistribution;        // Energy Distribution in MeV
+    private Distribution energyDistribution;        // Energy MonteCarloParticleTracer.Distribution in MeV
 
 
 
@@ -78,7 +80,7 @@ public class ParticleDistribution {
      * Depends on the boundaries of the plasma since this Distribution is defined in terms of normalized radii [0,1]
      */
 
-    public Particle sample(Plasma plasma){
+    public Particle sample(PlasmaLayer plasmaLayer){
 
         // Sample the position
         Vector3D position = Utils.sampleRandomNormalizedVector();
@@ -92,7 +94,11 @@ public class ParticleDistribution {
 
         // Use our radial distribution and the plasma bounds to determine the magnitude of
         // our position vector
-        double r = radialDistribution.sample() * plasma.getRadiusBound(theta, phi);
+        double rNorm = radialDistribution.sample();
+        double rMax  = plasmaLayer.getOuterRadiusBound(theta, phi);
+        double rMin  = plasmaLayer.getInnerRadiusBound(theta, phi);
+
+        double r = (rMax - rMin) * rNorm + rMin;
 
         // Rescale our position vector to this magnitude
         position = position.scalarMultiply(r);
@@ -105,7 +111,7 @@ public class ParticleDistribution {
         // Sample the energy
         double energy = energyDistribution.sample();
 
-        // Return the Particle Object
+        // Return the MonteCarloParticleTracer.Particle Object
         Particle particle = new Particle(getZ(), getMass(), position, direction, energy);
         particle.setWeight(particleWeight);
         return particle;
@@ -134,11 +140,11 @@ public class ParticleDistribution {
 
     public String toString(){
         String string = "";
-        string += "         Radial Distribution        \n";
+        string += "         Radial MonteCarloParticleTracer.Distribution        \n";
         string += "------------------------------------\n";
         string += radialDistribution.toString();
         string += "\n";
-        string += "         Energy Distribution        \n";
+        string += "         Energy MonteCarloParticleTracer.Distribution        \n";
         string += "------------------------------------\n";
         string += energyDistribution.toString();
         return string;

@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 /**
  * Created by lahmann on 2017-03-02.
  */

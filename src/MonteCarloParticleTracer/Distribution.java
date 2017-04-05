@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.exception.OutOfRangeException;
@@ -20,7 +22,7 @@ public class Distribution {
      * Built in predefined distributions
      */
 
-    static Distribution normDistribution(double mu, double sigma){
+    public static Distribution normDistribution(double mu, double sigma){
         final int NUM_SIGMAS_OUT = 5;
         double a = mu - NUM_SIGMAS_OUT*sigma;
         double b = mu + NUM_SIGMAS_OUT*sigma;
@@ -36,7 +38,7 @@ public class Distribution {
         return new Distribution(nodes, probabilities);
     }
 
-    static Distribution deltaFunction(double value){
+    public static Distribution deltaFunction(double value){
         return normDistribution(value, 1e-10*value);
     }
 
@@ -46,7 +48,7 @@ public class Distribution {
      * Constructors
      */
 
-    Distribution(double[] nodes, double[] frequencies) {
+    public Distribution(double[] nodes, double[] frequencies) {
 
         // Normalize the frequencies
         frequencies = normalize(frequencies);

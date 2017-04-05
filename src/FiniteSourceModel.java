@@ -1,3 +1,7 @@
+import MonteCarloParticleTracer.Particle;
+import MonteCarloParticleTracer.ParticleDistribution;
+import MonteCarloParticleTracer.PlasmaLayer;
+import MonteCarloParticleTracer.Utils;
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolatingFunction;
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolator;
 import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
@@ -10,7 +14,7 @@ import org.apache.commons.math3.util.FastMath;
  */
 public class FiniteSourceModel {
 
-    // Constants used when generating the stopping power function
+    // MonteCarloParticleTracer.Constants used when generating the stopping power function
     final double MINIMUM_STOPPING_POWER_ENERGY = Utils.MINIMUM_LI_PETRASSO_ENERGY_MeV;       // MeV
     final int NUM_ENERGY_NODES = 200;
 
@@ -22,13 +26,13 @@ public class FiniteSourceModel {
 
     private ParticleDistribution testParticleDistribution;
     private BicubicInterpolatingFunction stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
-    private Plasma plasma;
+    private PlasmaLayer plasma;
 
 
     private Vector3D diagnosticLocation;
 
 
-    public FiniteSourceModel(ParticleDistribution testParticleDistribution, Plasma plasma, Vector3D diagnosticLocation) {
+    public FiniteSourceModel(ParticleDistribution testParticleDistribution, PlasmaLayer plasma, Vector3D diagnosticLocation) {
         this.testParticleDistribution = testParticleDistribution;
         this.plasma = plasma;
         this.diagnosticLocation = diagnosticLocation;
@@ -112,7 +116,7 @@ public class FiniteSourceModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 0; i < energyNodes.length; i++){
-            //Particle p = new Particle(energyNodes[i], testParticleDistribution.getZ(), testParticleDistribution.getA());
+            //MonteCarloParticleTracer.Particle p = new MonteCarloParticleTracer.Particle(energyNodes[i], testParticleDistribution.getZ(), testParticleDistribution.getA());
             //dEdx[i] = plasma.getStoppingPower(p);
         }
 

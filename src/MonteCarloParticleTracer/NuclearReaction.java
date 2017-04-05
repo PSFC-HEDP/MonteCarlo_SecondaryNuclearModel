@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.exception.OutOfRangeException;
@@ -73,11 +75,11 @@ public class NuclearReaction {
          * How we would handle it if we didn't force the direction
          */
 
-        //Vector3D productVelocity_CoM = Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
+        //Vector3D productVelocity_CoM = MonteCarloParticleTracer.Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
         //Vector3D productVelocity_Lab = centerOfMassVelocity.add(productVelocity_CoM);
         //double productSpeed_Lab = productVelocity_Lab.getNorm();
-        //double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
-        //Particle productParticle = new Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab);
+        //double productEnergy_Lab = 0.5*MonteCarloParticleTracer.Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+        //MonteCarloParticleTracer.Particle productParticle = new MonteCarloParticleTracer.Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab);
 
 
         /**

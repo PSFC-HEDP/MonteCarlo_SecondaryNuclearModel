@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.FastMath;
 
@@ -6,14 +8,14 @@ import org.apache.commons.math3.util.FastMath;
  */
 public class Particle {
 
-    private ParticleType type;        // This Particle's ID
-    private double weight = 1.0;      // This Particle's statistical weight
+    private ParticleType type;        // This MonteCarloParticleTracer.Particle's ID
+    private double weight = 1.0;      // This MonteCarloParticleTracer.Particle's statistical weight
 
-    private Vector3D position;        // Position vector of this Particle in cm
-    private Vector3D velocity;        // Velocity of this Particle as a fraction of the speed of light
-    private Vector3D direction;       // Unit vector of the Particle's direction
+    private Vector3D position;        // Position vector of this MonteCarloParticleTracer.Particle in cm
+    private Vector3D velocity;        // Velocity of this MonteCarloParticleTracer.Particle as a fraction of the speed of light
+    private Vector3D direction;       // Unit vector of the MonteCarloParticleTracer.Particle's direction
 
-    private double energy;             // This Particle's energy in MeV
+    private double energy;             // This MonteCarloParticleTracer.Particle's energy in MeV
 
 
 
@@ -114,7 +116,7 @@ public class Particle {
 
 
     /**
-     * Step this Particle some distance through a material with stopping power dEdx
+     * Step this MonteCarloParticleTracer.Particle some distance through a material with stopping power dEdx
      */
 
     public Particle step(double distance, double dEdx){

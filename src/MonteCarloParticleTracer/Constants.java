@@ -1,3 +1,5 @@
+package MonteCarloParticleTracer;
+
 /**
  * Created by lahmann on 2017-03-02.
  */
@@ -14,7 +16,7 @@ public class Constants {
 
 
     /**
-     * Particle Types constants
+     * MonteCarloParticleTracer.Particle Types constants
      */
 
     public static final int NEUTRON_CHARGE = 0;

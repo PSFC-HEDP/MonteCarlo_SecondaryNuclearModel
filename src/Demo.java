@@ -1,3 +1,5 @@
+import MonteCarloParticleTracer.*;
+import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 import java.io.File;
@@ -11,7 +13,8 @@ public class Demo {
         File cStopPowFile = new File("src/cStopPow/cStopPow.DLL");       // Windows
 	    System.load(cStopPowFile.getAbsolutePath());
 
-        testSpectraAsymmetry(1.0);
+        testSpectraAsymmetry(0.2);
+        //testConvergenceEffects(MonteCarloParticleTracer.Utils.linspace(1e-4*900.0, 1e-4*50.0, 2));
 
     }
 
@@ -26,8 +29,8 @@ public class Demo {
         final int numParticles = (int) 1e5;
         final double[] energyNodes = Utils.linspace(11.0, 18.0, 100);
 
-        final Vector3D polarLineOfSight = new Vector3D(0.0, 0.0, 100.0);
-        final Vector3D equatorialLineOfSight = new Vector3D(100.0, 0.0, 0.0);
+        final Vector3D specSP_LOS = new SphericalCoordinates(1800, Math.toRadians(56), Math.toRadians(161)).getCartesian();
+        final Vector3D specE_LOS  = new SphericalCoordinates(1800, Math.toRadians(174), Math.toRadians(90)).getCartesian();
 
         final double totalVolume = (4.0/3.0) * Math.PI * Math.pow(1e-4* initialRadius_um, 3);
         final double totalMass = 1e-3 * fillDensity_mgPerCc * totalVolume;
@@ -44,12 +47,58 @@ public class Demo {
 
 
             // Make the plasma
-            Plasma plasma = Plasma.uniformPlasma(P0, totalMass, Tion);
+            PlasmaLayer plasma = PlasmaLayer.uniformPlasma(P0, totalMass, Tion);
             plasma.addDeuteriumSpecies(1.0);
             plasma.addLegendreMode(2, 0, P2);
 
 
-            // Make the Particle Distribution
+            // Make the MonteCarloParticleTracer.Particle MonteCarloParticleTracer.Distribution
+            ParticleDistribution tritons = ParticleDistribution.ThermalDDtDistribution(
+                    plasma.getSpatialDDpBurnDistribution(), 1e-3);
+
+
+            // Make the model
+            Model model = new Model(name, tritons, NuclearReaction.DTn, plasma);
+
+
+            // Run the model
+            model.runSimulation(numParticles, specSP_LOS, energyNodes);
+            model.runSimulation(numParticles, specE_LOS, energyNodes);
+
+        }
+
+
+    }
+
+    public static void testConvergenceEffects(double ... P0s){
+
+        final double fillDensity_mgPerCc = 3.8;
+        final double initialRadius_um = 900.0;
+
+        final double Tion = 1.0;
+
+        final int numParticles = (int) 1e5;
+        final double[] energyNodes = Utils.linspace(11.0, 18.0, 100);
+
+        final Vector3D polarLineOfSight = new Vector3D(0.0, 0.0, 100.0);
+
+        final double totalVolume = (4.0/3.0) * Math.PI * Math.pow(1e-4* initialRadius_um, 3);
+        final double totalMass = 1e-3 * fillDensity_mgPerCc * totalVolume;
+
+
+        for (double P0 : P0s){
+
+            // Name the model
+            String name = String.format("Secondary_DTn_P0_%.2f", P0);
+            System.out.print(P0 + " ");
+
+
+            // Make the plasma
+            PlasmaLayer plasma = PlasmaLayer.uniformPlasma(P0, totalMass, Tion);
+            plasma.addDeuteriumSpecies(1.0);
+
+
+            // Make the MonteCarloParticleTracer.Particle MonteCarloParticleTracer.Distribution
             ParticleDistribution tritons = ParticleDistribution.ThermalDDtDistribution(
                     plasma.getSpatialDDpBurnDistribution(), 1e-3);
 
@@ -60,32 +109,9 @@ public class Demo {
 
             // Run the model
             model.runSimulation(numParticles, polarLineOfSight, energyNodes);
-            model.runSimulation(numParticles, equatorialLineOfSight, energyNodes);
 
         }
 
-
-    }
-
-    public static void generateYieldRatioCurve(double Tion, double massDensity) {
-
-        final int NUM_PARTICLES = (int) 1e3;
-
-        /**
-         * Make base plasma object
-         */
-        Plasma uniformPlasma = Plasma.uniformPlasma(1, 1, Tion);
-        uniformPlasma.setCenterMassDensity(massDensity);
-        uniformPlasma.addDeuteriumSpecies(1.0);
-
-        double[] plasmaRhoRs = Utils.logspace(-4, -1, 100);      // g per cm^2
-        for (double rhoR : plasmaRhoRs) {
-            // Set the radius
-            double plasmaRadius = rhoR / massDensity;
-            uniformPlasma.setP0(plasmaRadius);
-
-            runUniformModel(uniformPlasma, NUM_PARTICLES);
-        }
 
     }
 
@@ -100,7 +126,7 @@ public class Demo {
         /**
          * Make base plasma object
          */
-        Plasma uniformPlasma = Plasma.uniformPlasma(1, 1, Tion);
+        PlasmaLayer uniformPlasma = PlasmaLayer.uniformPlasma(1, 1, Tion);
         uniformPlasma.setCenterMassDensity(massDensity);
         uniformPlasma.addDeuteriumSpecies(1.0);
 
@@ -115,7 +141,7 @@ public class Demo {
     }
 
 
-    public static void runUniformModel(Plasma plasma, int numParticles) {
+    public static void runUniformModel(PlasmaLayer plasma, int numParticles) {
 
         final double[] energyNodes = Utils.linspace(11, 18, 100);
 
@@ -127,8 +153,8 @@ public class Demo {
 
 
         // Create the models
-        Model neutronModel = new Model("DT Neutron Model", tritons, NuclearReaction.DTn, plasma);
-        Model protonModel = new Model("D3He Proton Model", helium3s, NuclearReaction.D3Hep, plasma);
+        Model neutronModel = new Model("DT Neutron MonteCarloParticleTracer.Model", tritons, NuclearReaction.DTn, plasma);
+        Model protonModel = new Model("D3He Proton MonteCarloParticleTracer.Model", helium3s, NuclearReaction.D3Hep, plasma);
 
 
         // Run the models

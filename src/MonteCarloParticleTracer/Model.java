@@ -1,14 +1,17 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Created by lahmann on 2016-06-19.
  *
  * Class the holds all of the information required to sample particles from some ParticleDistribution
- * and track them through some Plasma. The actual step by step logic of the simulation is handled within
+ * and track them through some PlasmaLayer. The actual step by step logic of the simulation is handled within
  * individual ParticleHistoryTasks, this class just initiates them
  *
  */
@@ -20,7 +23,11 @@ public class Model {
     private NuclearReaction nuclearReaction;
 
     private Plasma plasma;
-    private StoppingPowerModel stoppingPower;
+    private ArrayList<StoppingPowerModel> stoppingPowerModels;
+
+    // TODO: TEMP!
+    public double[] energyNodes;
+    public double[] energyTallies;
 
 
     public Model(String name, ParticleDistribution testParticleDistribution, NuclearReaction nuclearReaction, Plasma plasma) {
@@ -31,7 +38,11 @@ public class Model {
         this.nuclearReaction = nuclearReaction;
 
         this.plasma = plasma;
-        this.stoppingPower = new StoppingPowerModel(testParticleDistribution, plasma);
+
+        stoppingPowerModels = new ArrayList<>();
+        for (PlasmaLayer layer : plasma.getLayers()){
+            stoppingPowerModels.add(new StoppingPowerModel(testParticleDistribution, layer));
+        }
     }
 
     public void runSimulation(int totalParticles, Vector3D detectorLineOfSight, double[] energyNodes){
@@ -51,8 +62,8 @@ public class Model {
         Thread[] threads = new Thread[numCPUs];
         ParticleHistoryTask[] tasks = new ParticleHistoryTask[numCPUs];
         for (int i = 0; i < numCPUs; i++){
-            tasks[i] = new ParticleHistoryTask(testParticleDistribution, nuclearReaction, plasma,
-                    stoppingPower, totalPerThread, detectorLineOfSight, energyNodes);
+            tasks[i] = new ParticleHistoryTask(testParticleDistribution, nuclearReaction, plasma.getLayers(),
+                    stoppingPowerModels, totalPerThread, detectorLineOfSight, energyNodes);
 
             //tasks[i].setDebugMode(true);
             //tasks[i].run();
@@ -63,7 +74,8 @@ public class Model {
         }
 
         double reactionProbability = 0.0;
-        double[] energyTallies = new double[energyNodes.length];
+        this.energyNodes = energyNodes;
+        this.energyTallies = new double[energyNodes.length];
 
         for (int i = 0; i < numCPUs; i ++){
             try {
@@ -80,6 +92,7 @@ public class Model {
                 e.printStackTrace();
             }
         }
+
 
         try {
             FileWriter w = new FileWriter(new File(name + "_" + System.currentTimeMillis() + ".csv"));

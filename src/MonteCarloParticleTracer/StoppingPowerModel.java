@@ -1,5 +1,5 @@
-import cStopPow.DoubleVector;
-import cStopPow.StopPow_LP;
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolatingFunction;
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolator;
 import org.apache.commons.math3.util.FastMath;
@@ -17,11 +17,11 @@ public class StoppingPowerModel {
     private double[] energyNodes;
 
 
-    public StoppingPowerModel(ParticleDistribution particleDistribution, Plasma plasma){
+    public StoppingPowerModel(ParticleDistribution particleDistribution, PlasmaLayer plasmaLayer){
 
         final double maxEnergy = particleDistribution.getMaxEnergy();
         energyNodes = new double[NUM_ENERGY_NODES+1];
-        radiusNodes = plasma.getRadiusNodes();
+        radiusNodes = plasmaLayer.getRadiusNodes();
 
 
         energyNodes[0] = 0.0;
@@ -33,7 +33,7 @@ public class StoppingPowerModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 1; i < energyNodes.length; i++){
-            dEdx[i] = plasma.getStoppingPower(particleDistribution.getType(), energyNodes[i]);
+            dEdx[i] = plasmaLayer.getStoppingPower(particleDistribution.getType(), energyNodes[i]);
         }
 
 

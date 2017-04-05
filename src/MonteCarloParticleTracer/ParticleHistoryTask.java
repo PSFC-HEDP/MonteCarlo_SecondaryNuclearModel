@@ -1,7 +1,10 @@
+package MonteCarloParticleTracer;
+
 import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
@@ -13,10 +16,10 @@ import java.util.concurrent.TimeoutException;
 public class ParticleHistoryTask implements RunnableFuture {
 
     private NuclearReaction nuclearReaction;
-    private StoppingPowerModel stoppingPower;     // Stopping power profile defined in f(E,r) space (MeV / cm)
+    private ArrayList<StoppingPowerModel> stoppingPowerModels;     // Stopping power profile defined in f(E,r) space (MeV / cm)
     private ParticleDistribution particleDistribution;
     private ParticleType reactingPlasmaSpecies;
-    private Plasma plasma;
+    private ArrayList<PlasmaLayer> plasmaLayers;
     private Vector3D detectorLineOfSight;
     private EnergyTally energyTally;
     private int numParticles;
@@ -35,19 +38,20 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
     public ParticleHistoryTask(ParticleDistribution particleDistribution, NuclearReaction nuclearReaction,
-                               Plasma plasma, StoppingPowerModel stoppingPower,
+                               ArrayList<PlasmaLayer> plasmaLayers, ArrayList<StoppingPowerModel> stoppingPowerModels,
                                int numParticles, Vector3D detectorLineOfSight, double[] energyNodes) {
 
         this.particleDistribution = particleDistribution;
         this.nuclearReaction = nuclearReaction;
 
-        this.plasma = plasma;
-        this.stoppingPower = stoppingPower;
+        this.plasmaLayers = plasmaLayers;
+        this.stoppingPowerModels = stoppingPowerModels;
 
         this.numParticles = numParticles;
         this.detectorLineOfSight = detectorLineOfSight;
         this.energyTally = new EnergyTally(energyNodes);
 
+        /**
         // Verify that we have a combination of distribution / plasma / nuclear reaction that makes sense
         if (particleDistribution.getType().equals(nuclearReaction.getReactantParticleTypeA())){
             if (plasma.containsSpecies(nuclearReaction.getReactantParticleTypeB())){
@@ -66,6 +70,7 @@ public class ParticleHistoryTask implements RunnableFuture {
         else {
             System.exit(-1);
         }
+         */
 
     }
 
@@ -78,16 +83,18 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         for (int i = 0; i < numParticles; i++) {
 
-            // Sample a particle
-            Particle particle = particleDistribution.sample(plasma);
+            // TODO: We are currently assuming that particles always get born in the center most layer
+            int currentLayer = 0;
 
+            // Sample a particle
+            Particle particle = particleDistribution.sample(plasmaLayers.get(currentLayer));
 
             // DEBUG MODE LINE
             if (debugMode)  System.out.printf("Starting history %d:\n" + particle.toString(), i+1);
 
 
             // Determine how far this particle needs to travel
-            double distance = getDistanceToPlasmaBoundary(particle);
+            double distance = getDistanceToPlasmaBoundary(particle, plasmaLayers.get(currentLayer));
 
 
             // Calculate a step size
@@ -104,15 +111,15 @@ public class ParticleHistoryTask implements RunnableFuture {
             while (distance > dx && particle.getEnergy() >  0.0) {
 
                 // Parameters at the starting point
-                double r1 = getNormalizedRadius(particle);
+                double r1 = getNormalizedRadius(particle, plasmaLayers.get(currentLayer));
                 double E1 = particle.getEnergy();
-                double dEdx1 = stoppingPower.evaluate(E1, r1);
+                double dEdx1 = stoppingPowerModels.get(currentLayer).evaluate(E1, r1);
 
                 // If the particle is losing a significant amount of energy, we need to take smaller steps
                 dx = Math.min(dx, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
 
                 // Calculate r2 before the energy loop to save time
-                double r2 = getNormalizedRadius(particle.step(dx, 0.0));
+                double r2 = getNormalizedRadius(particle.step(dx, 0.0), plasmaLayers.get(currentLayer));
 
 
                 // Use trapezoidal method to iterate onto the particle's final energy
@@ -131,17 +138,20 @@ public class ParticleHistoryTask implements RunnableFuture {
                     if (newEnergy < 0.0){
                         newEnergy = 0.0;
                         dx = -E1 / averageStopping;
-                        r2 = getNormalizedRadius(particle.step(dx, 0.0));
+                        r2 = getNormalizedRadius(particle.step(dx, 0.0), plasmaLayers.get(currentLayer));
                     }
 
                     energyError = FastMath.abs(newEnergy - E2)/E2;
                     E2 = newEnergy;
-                    dEdx2 = stoppingPower.evaluate(E2, r2);
+                    dEdx2 = stoppingPowerModels.get(currentLayer).evaluate(E2, r2);
                 }
 
                 // DEBUG MODE LINE
                 //if (debugMode)  System.out.printf("-->  After step %d:\n" + particle.toString(), totalSteps+1);
 
+                /**
+                 * TODO: I'm commenting this all out as a quick way to get Maria's data.
+                 * TODO: Future implementations need to have this be an option
 
                 // Grab the average number density of the species we're interacting with between these two positions
                 double n1 = plasma.getSpeciesNumberDensity(particle.getPosition(), reactingPlasmaSpecies);
@@ -180,20 +190,68 @@ public class ParticleHistoryTask implements RunnableFuture {
                 // Add this to the tally
                 energyTally.addTally(productParticle.getEnergy(), productParticle.getWeight() * productParticle.getEnergy());
 
+                 particleReactionProb += stepReactionProbability;
+                 */
+
                 // Initialize the next step
                 particle = steppedParticle;
 
                 totalSteps++;
                 distance -= dx;
-                particleReactionProb += stepReactionProbability;
+
+                // If we're at the edge of a layer check and see if we're moving into a new one
+                if (distance < dx){
+
+                    // If we're closer to the outer boundary of this layer
+                    if (plasmaLayers.get(currentLayer).getIsCloserToOuterBoundary(particle.getPosition())){
+                        // AND there's another layer beyond this one
+                        if (currentLayer < plasmaLayers.size() - 1){
+                            currentLayer++;
+
+                            // Place the particle on the inner boundary of the next layer
+                            double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
+                            double theta  = coordinates[1];
+                            double phi    = coordinates[2];
+                            double radius = plasmaLayers.get(currentLayer).getInnerRadiusBound(theta, phi);
+
+                            particle.setPosition(Utils.getVectorFromSpherical(radius, theta, phi));
+
+                            // Calculate the new distance we need to travel
+                            distance = getDistanceToPlasmaBoundary(particle, plasmaLayers.get(currentLayer));
+                        }
+                    }
+
+                    // Otherwise, we're close to the inner boundary
+                    else{
+                        currentLayer--;
+
+                        // Place the particle on the outer boundary of the previous layer
+                        double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
+                        double theta  = coordinates[1];
+                        double phi    = coordinates[2];
+                        double radius = plasmaLayers.get(currentLayer).getOuterRadiusBound(theta, phi);
+
+                        particle.setPosition(Utils.getVectorFromSpherical(radius, theta, phi));
+
+                        // Calculate the new distance we need to travel
+                        distance = getDistanceToPlasmaBoundary(particle, plasmaLayers.get(currentLayer));
+                    }
+                }
             }
 
+            // TODO: Temp line
+            energyTally.addTally(particle.getEnergy(), 1.0);
+
+            /**
             particle.multiplyWeight(particleReactionProb);
             taskReactionProbability += particle.getWeight();
+             */
         }
 
+        /**
         // We need to re-normalize the energy tally due to the ad hoc weighting we do
         energyTally.setSum(taskReactionProbability);
+         */
     }
 
     /**
@@ -212,31 +270,31 @@ public class ParticleHistoryTask implements RunnableFuture {
      * Private convenience methods
      */
 
-    private double getNormalizedRadius(Particle particle){
-        Vector3D position = particle.getPosition();
+    private double getNormalizedRadius(Particle particle, PlasmaLayer plasmaLayer){
+        double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
 
-        SphericalCoordinates coordinates = new SphericalCoordinates(position);
+        double R     = coordinates[0];
+        double theta = coordinates[1];
+        double phi   = coordinates[2];
 
-        // Apache is in Math notation whilst we're in Physics notation
-        double theta = coordinates.getPhi();
-        double phi = coordinates.getTheta();
-
-        // Position and energy at our starting point
-        return position.getNorm() / plasma.getRadiusBound(theta, phi);
+        double rMax = plasmaLayer.getOuterRadiusBound(theta, phi);
+        double rMin = plasmaLayer.getInnerRadiusBound(theta, phi);
+        return (R - rMin) / (rMax - rMin);
     }
 
-    private double getDistanceToPlasmaBoundary(Particle particle){
+    private double getDistanceToPlasmaBoundary(Particle particle, PlasmaLayer plasmaLayer){
 
         // Create a clone that we'll use for the calculation
         Particle tempParticle = particle.clone();
 
         // We need some kind of guess of what the step size should be to get started
-        double plasmaBound = plasma.getRadiusBound(0.0, 0.0);
-        double dx = plasmaBound / MIN_NUM_STEPS;
+        double plasmaRmax = plasmaLayer.getOuterRadiusBound(0.0, 0.0);
+        double plasmaRmin = plasmaLayer.getInnerRadiusBound(0.0, 0.0);
+        double dx = (plasmaRmax - plasmaRmin) / MIN_NUM_STEPS;
 
         // Step our particle until we're no longer in the plasma
         double distance = 0.0;
-        while (plasma.getIsInside(tempParticle.getPosition())){
+        while (plasmaLayer.getIsInside(tempParticle.getPosition())){
             tempParticle = tempParticle.step(dx, 0.0);
             distance += dx;
         }
@@ -257,7 +315,7 @@ public class ParticleHistoryTask implements RunnableFuture {
             // To avoid "out of bound" errors, it's very important that we always stay inside the plasma
             // We do this by never updating the error calculation if we're outside the plasma
             // As a result, we'll always underestimate the TRUE distance. Never overestimate
-            if (plasma.getIsInside(tempParticle.getPosition())){
+            if (plasmaLayer.getIsInside(tempParticle.getPosition())){
                 double newDistance = distance + dx;
                 distanceError = FastMath.abs(newDistance - distance)/distance;
                 distance = newDistance;
