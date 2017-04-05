@@ -251,8 +251,13 @@ public class PlasmaLayer {
         return massDensity.getKnots();
     }
 
+    public ArrayList<LegendreMode> getInnerBoundaryLegendreModes() {
+        return innerBoundaryLegendreModes;
+    }
 
-
+    public ArrayList<LegendreMode> getOuterBoundaryLegendreModes() {
+        return outerBoundaryLegendreModes;
+    }
 
     /**
      * Methods for evaluating this PlasmaLayer's conditions at some position vector r
@@ -546,6 +551,13 @@ public class PlasmaLayer {
         multiplyElectronTemperatureByScalar(multiplicativeFactor);
     }
 
+    public void setInnerBoundaryLegendreModes(ArrayList<LegendreMode> innerBoundaryLegendreModes) {
+        this.innerBoundaryLegendreModes = innerBoundaryLegendreModes;
+    }
+
+    public void setOuterBoundaryLegendreModes(ArrayList<LegendreMode> outerBoundaryLegendreModes) {
+        this.outerBoundaryLegendreModes = outerBoundaryLegendreModes;
+    }
 
     /**
      * Methods for multiplying the profiles by a scalar

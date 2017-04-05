@@ -43,6 +43,18 @@ public class Utils {
         return nodes;
     }
 
+    public static double getNormalizedRadius(Particle particle, PlasmaLayer plasmaLayer){
+        double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
+
+        double R     = coordinates[0];
+        double theta = coordinates[1];
+        double phi   = coordinates[2];
+
+        double rMax = plasmaLayer.getOuterRadiusBound(theta, phi);
+        double rMin = plasmaLayer.getInnerRadiusBound(theta, phi);
+        return (R - rMin) / (rMax - rMin);
+    }
+
     public static double[] getSphericalFromVector(Vector3D vector){
         SphericalCoordinates coordinates = new SphericalCoordinates(vector);
 
