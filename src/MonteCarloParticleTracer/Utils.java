@@ -20,6 +20,7 @@ public class Utils {
     public static final String DDp_REACTIVITY_FILE = "./data/DDp_Reactivities.dat";
     public static final String DDn_REACTIVITY_FILE = "./data/DDn_Reactivities.dat";
     public static final String D3Hep_REACTIVITY_FILE = "./data/D3Hep_Reactivities.dat";
+    public static final String He3He3_REACTIVITY_FILE = "./data/3He3He_Reactivities.dat";
 
 
     public static double[] linspace(double a, double b, int N){

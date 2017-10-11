@@ -2,8 +2,6 @@ import MonteCarloParticleTracer.*;
 import cStopPow.DoubleVector;
 import cStopPow.StopPow;
 import cStopPow.StopPow_LP;
-import org.apache.commons.math3.fitting.GaussianCurveFitter;
-import org.apache.commons.math3.fitting.WeightedObservedPoints;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -13,7 +11,7 @@ import java.util.Scanner;
 /**
  * Created by lahmann on 2017-02-27.
  */
-public class Demo2 {
+public class N170212_003_999 {
 
     private static double N170212_003_FillPressure_Torr = 7600.0;
     private static double N170212_003_FillTemperature_K = 293.15;
@@ -36,31 +34,46 @@ public class Demo2 {
         for (double P0 : P0s) {
             for (double burnT : burnTs) {
                 System.out.println("Starting at " + System.currentTimeMillis());
-                testModel(1e-4 * P0, burnT, 1.0);
+                testModel(1e-4 * P0, burnT, 1.0, 4*1e-3);
                 System.out.println("Done at " + System.currentTimeMillis());
             }
         }
 
     }
 
-    public static void testModel(double P0, double burnT, double TeFraction) throws Exception {
+    public static void testModel(double P0, double burnT, double TeFraction, double shellRhoR) throws Exception {
 
-        final int NUM_PARTICLES = (int) 5e5;
+        final double shellRho = 1.0;        // g /cc
+        final double shellT   = 0.1;        // keV
+
+        final int NUM_PARTICLES = (int) 1e5;
         final double TOTAL_MASS = getN170212_003TotalMass();
-        final double[] energyNodes = Utils.linspace(10.0, 16.0, 301);
 
         // Relation from Maria (03-02-2017) using basic reactivity scaling based on the measured yield
         //double P0 = 6.83088 * burnT * burnT - 28.7257 * burnT + 25.7562;        // in um
         //P0 *= 1e-4;     // um -> cm
 
+        /**
+         * Make a FileWriter
+         */
         FileWriter w = new FileWriter("data.csv", true);
         w.write(String.format("%.4e,%.4e,", 1e4*P0, burnT));
 
+
         /**
-         * Make the helium-3 plasma
+         * Make the helium-3 fuel plasma
          */
-        PlasmaLayer plasma = PlasmaLayer.uniformPlasma(P0, TOTAL_MASS, burnT, TeFraction);
-        plasma.addHelium3Species(1.0);
+        PlasmaLayer fuelLayer = PlasmaLayer.UniformPlasmaOfKnownTotalMass(P0, TOTAL_MASS, burnT, TeFraction);
+        fuelLayer.addHelium3Species(1.0);
+
+
+        /**
+         * Make the CH shell plasma
+         */
+        //double thickness = shellRhoR / shellRho;
+        //PlasmaLayer shellLayer = PlasmaLayer.UniformPlasmaOfKnownMassDensity(P0 + thickness, shellRho, shellT);
+        //shellLayer.addSpecies(ParticleType.proton, 0.5);
+        //shellLayer.addSpecies(ParticleType.carbon, 0.5);
 
 
 
@@ -69,72 +82,37 @@ public class Demo2 {
          */
         double temperatureSigmaMeV = 1e-3*Math.sqrt(burnT*5856.0);
 
-        Distribution uniformDistribution = plasma.getSpatialDDnBurnDistribution();
-        Distribution energyDistribution  = Distribution.normDistribution(14.7, temperatureSigmaMeV);
+        Distribution burnDistribution = fuelLayer.getSpatialD3HepBurnDistribution();
+        //Distribution hotspotDistribution = Distribution.deltaFunction(1e-36);
+        //Distribution energyDistribution  = Distribution.normDistribution(14.7, temperatureSigmaMeV);
+        Distribution monoEnergetic       = Distribution.deltaFunction(14.7);
 
-        ParticleDistribution particleDistribution = new ParticleDistribution(1, 1,
-                uniformDistribution, energyDistribution);
+        ParticleDistribution particleDistribution = new ParticleDistribution(ParticleType.proton,
+                burnDistribution, monoEnergetic);
 
+        /**
+         * Make the WRF proton distribution
+        Distribution burnDistribution = fuelLayer.getSpatialD3HepBurnDistribution();
+        Distribution energyDistribution  = getWRFDistribution(new File("data/N170212-002-999_10cm_WRF_Spectrum.dat"));
+
+        ParticleDistribution particleDistribution = new ParticleDistribution(ParticleType.proton,
+                burnDistribution, energyDistribution);
+         */
 
 
         /**
          * Make the model
          */
-        Model model = new Model("FiniteSource", particleDistribution, null, plasma);
-        model.runSimulation(NUM_PARTICLES, null, energyNodes);
-
-
-
-        /**
-         * Fit a gaussian to the resulting tally and infer a Tion
-         */
-        WeightedObservedPoints points = new WeightedObservedPoints();
-        for (int i = 0; i < model.energyNodes.length; i++){
-            points.add(model.energyNodes[i], model.energyTallies[i]);
-        }
-
-        double[] parameters = GaussianCurveFitter.create().fit(points.toList());
-        double meanEnergy_MeV = parameters[1];
-        double sigma_keV = 1e3*parameters[2];
-
-        double inferredTion = sigma_keV*sigma_keV / 5856.0;
-
-        w.write(String.format("%.4e,%.4e,", meanEnergy_MeV, inferredTion));
+        Model model = new Model(new File("N170212-003-999 Model.output"));
+        model.addPlasmaLayer(fuelLayer);
+        //model.addPlasmaLayer(shellLayer);
+        model.setSourceParticleDistribution(particleDistribution);
 
 
         /**
-         * Range that spectrum through CH to make meanEnergy consistent
+         * Run it
          */
-        Spectrum spectrum = new Spectrum(model.energyNodes, model.energyTallies);
-        StopPow_LP stopPowLp = getCH_StopPow(1.0, 1.06);
-        double thickness;
-        try {
-            thickness = stopPowLp.Thickness(meanEnergy_MeV, N170212_003_meanEnergy);
-        }catch (IllegalArgumentException e){
-            w.write("\n");
-            w.close();
-            return;
-        }
-
-        spectrum.range(stopPowLp, thickness);
-
-        /**
-         * Fit a gaussian to this new spectrum
-         */
-        points = new WeightedObservedPoints();
-        for (int i = 0; i < spectrum.energies.size(); i++){
-            points.add(spectrum.energies.get(i), spectrum.frequencies.get(i));
-        }
-        parameters = GaussianCurveFitter.create().fit(points.toList());
-        meanEnergy_MeV = parameters[1];
-        sigma_keV = 1e3*parameters[2];
-
-        inferredTion = sigma_keV*sigma_keV / 5856.0;
-
-        w.write(String.format("%.4e,%.4e,%.4e\n", thickness, meanEnergy_MeV, inferredTion));
-        w.close();
-
-        System.out.println(spectrum);
+        model.runSimulation(NUM_PARTICLES, 4);
     }
 
     private static double getN170212_003TotalMass(){
@@ -155,6 +133,28 @@ public class Demo2 {
         double totalMass =  massDensity * volume;
 
         return totalMass;
+    }
+
+    private static Distribution getWRFDistribution(File file) throws Exception{
+        Scanner s = new Scanner(file);
+
+        ArrayList<Double> nodes  = new ArrayList<>();
+        ArrayList<Double> values = new ArrayList<>();
+
+        while (s.hasNext()){
+            nodes.add(s.nextDouble());
+            values.add(s.nextDouble());
+        }
+
+        double[] nodeArray  = new double[nodes.size()];
+        double[] valueArray = new double[values.size()];
+
+        for (int i = 0; i < nodes.size(); i++){
+            nodeArray[i]  =  nodes.get(i);
+            valueArray[i] = values.get(i);
+        }
+
+        return new Distribution(nodeArray, valueArray);
     }
 
     private static PlasmaLayer getN170212_003Plasma(double P0, double burnT, double TeFraction){
@@ -181,7 +181,7 @@ public class Demo2 {
             }
 
             PlasmaLayer plasma = new PlasmaLayer(Ti, Te, rho);
-            plasma.setP0(P0);
+            plasma.setOuterP0(P0);
             plasma.setD3HepBurnAveragedIonTemperature(burnT);
             plasma.setElectronTemperatureFraction(TeFraction);
             plasma.setTotalMass(getN170212_003TotalMass());

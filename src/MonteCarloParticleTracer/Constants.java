@@ -12,6 +12,7 @@ public class Constants {
     public static final double PROTON_MASS_KG = 1.6726219e-27;
     public static final double MEV_PER_AMU = 931.5;
     public static final double SPEED_OF_LIGHT_CM_PER_SEC = 2.998e+10;
+    public static final double BOLTZMANN_CONSTANT_J_PER_K = 1.38064852e-23;
 
 
 
@@ -25,6 +26,7 @@ public class Constants {
     public static final int TRITIUM_CHARGE = 1;
     public static final int HELIUM3_CHARGE = 2;
     public static final int ALPHA_CHARGE = 2;
+    public static final int CARBON_CHARGE = 6;
 
     public static final double NEUTRON_MASS_AMU = 1.00866491588;
     public static final double PROTON_MASS_AMU = 1.00727647;
@@ -32,6 +34,7 @@ public class Constants {
     public static final double HELIUM3_MASS_AMU = 3.0160293 - 2*0.00054858;
     public static final double TRITIUM_MASS_AMU = 3.0160492 - 1*0.00054858;
     public static final double ALPHA_MASS_AMU = 4.001506179127;
+    public static final double CARBON_MASS_AMU = 12.0107 - 6*0.00054858;
 
 
 

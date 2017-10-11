@@ -18,6 +18,7 @@ public class ParticleType {
     public static final ParticleType triton = new ParticleType(Constants.TRITIUM_CHARGE, Constants.TRITIUM_MASS_AMU);
     public static final ParticleType helium3 = new ParticleType(Constants.HELIUM3_CHARGE, Constants.HELIUM3_MASS_AMU);
     public static final ParticleType alpha = new ParticleType(Constants.ALPHA_CHARGE, Constants.ALPHA_MASS_AMU);
+    public static final ParticleType carbon = new ParticleType(Constants.CARBON_CHARGE, Constants.CARBON_MASS_AMU);
 
 
     public ParticleType(int Z, double mass) {
@@ -36,4 +37,24 @@ public class ParticleType {
     public double getMass() {
         return mass;
     }
+
+    public boolean equals(Object o){
+        if (o == this) return true;
+        if (!(o instanceof ParticleType)) return false;
+
+        ParticleType type = (ParticleType) o;
+        return Z == type.getZ() && mass == type.getMass();
+    }
+
+    // We'll use ZAID as our unique hash identifier
+    public int hashCode(){
+        return 1000*Z + (int) Math.round(mass);
+    }
+
+    public String toString(){
+        int ZAID = 1000*Z + (int) Math.round(mass);
+        return Integer.toString(ZAID);
+    }
+
+
 }

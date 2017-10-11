@@ -8,27 +8,28 @@ import org.apache.commons.math3.util.FastMath;
  */
 public class Particle {
 
-    private ParticleType type;        // This MonteCarloParticleTracer.Particle's ID
-    private double weight = 1.0;      // This MonteCarloParticleTracer.Particle's statistical weight
+    private ParticleType type;        // This Particle's ID
+    private double weight = 1.0;      // This Particle's statistical weight
 
-    private Vector3D position;        // Position vector of this MonteCarloParticleTracer.Particle in cm
-    private Vector3D velocity;        // Velocity of this MonteCarloParticleTracer.Particle as a fraction of the speed of light
-    private Vector3D direction;       // Unit vector of the MonteCarloParticleTracer.Particle's direction
+    private Vector3D position;        // Position vector of this Particle in cm
+    private Vector3D velocity;        // Velocity of this Particle as a fraction of the speed of light
+    private Vector3D direction;       // Unit vector of the Particle's direction
 
-    private double energy;             // This MonteCarloParticleTracer.Particle's energy in MeV
+    private double energy;            // This Particle's energy in MeV
+    private double time;              // Time since the birth of the source particles in seconds
 
 
 
-
-    public Particle(int Z, double mass, Vector3D position, Vector3D direction, double energy) {
-        this(new ParticleType(Z, mass), position, direction, energy);
+    public Particle(int Z, double mass, Vector3D position, Vector3D direction, double energy, double time) {
+        this(new ParticleType(Z, mass), position, direction, energy, time);
     }
 
-    public Particle(ParticleType type, Vector3D position, Vector3D direction, double energy) {
+    public Particle(ParticleType type, Vector3D position, Vector3D direction, double energy, double time) {
         this.type = type;
         this.position = position;
         this.direction = direction;
         this.energy = energy;
+        this.time = time;
 
         double speed = FastMath.sqrt(2*energy/type.getMass()/Constants.MEV_PER_AMU);        // (v/c)
         this.velocity = direction.scalarMultiply(speed);
@@ -45,7 +46,7 @@ public class Particle {
     }
 
     public Particle clone(){
-        Particle particle = new Particle(type, position, direction, energy);
+        Particle particle = new Particle(type, position, direction, energy, time);
         particle.setWeight(weight);
         return particle;
     }
@@ -74,6 +75,10 @@ public class Particle {
 
     public void setEnergy(double energy) {
         this.energy = energy;
+    }
+
+    public void setTime(double time) {
+        this.time = time;
     }
 
     /**
@@ -113,19 +118,23 @@ public class Particle {
         return energy;
     }
 
-
+    public double getTime() {
+        return time;
+    }
 
     /**
-     * Step this MonteCarloParticleTracer.Particle some distance through a material with stopping power dEdx
+     * Step this Particle some distance through a material with stopping power dEdx
      */
 
     public Particle step(double distance, double dEdx){
         Vector3D newPosition = this.position.add(distance, direction);
         double newEnergy = this.energy + dEdx*distance;
+        double newTime = this.time + distance / velocity.getNorm() / Constants.SPEED_OF_LIGHT_CM_PER_SEC;
 
         Particle steppedParticle = this.clone();
         steppedParticle.setPosition(newPosition);
         steppedParticle.setEnergy(newEnergy);
+        steppedParticle.setTime(newTime);
 
         return steppedParticle;
     }
@@ -137,14 +146,16 @@ public class Particle {
                 "rx = %+.4e cm, ry = %+.4e cm, rz = %+.4e cm\n" +
                 "dx = %+.4e   , dy = %+.4e   , dz = %+.4e   \n" +
                 "vx = %+.4e   , vy = %+.4e   , vz = %+.4e   \n" +
-                "E  = %+.4e MeV\n",
+                "E  = %+.4e MeV\n" +
+                "t  = %+.4e s\n",
 
                 type.getZ(), type.getMass(),
                 weight,
                 position.getX(), position.getY(), position.getZ(),
                 direction.getX(), direction.getY(), direction.getZ(),
                 velocity.getX(), velocity.getY(), velocity.getZ(),
-                energy
+                energy,
+                time
         );
 
     }

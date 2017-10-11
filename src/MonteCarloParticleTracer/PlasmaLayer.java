@@ -2,11 +2,11 @@ package MonteCarloParticleTracer;
 
 import cStopPow.DoubleVector;
 import cStopPow.StopPow_LP;
+import org.apache.commons.math3.analysis.integration.TrapezoidIntegrator;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.exception.OutOfRangeException;
-import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.apache.commons.math3.util.FastMath;
@@ -51,15 +51,15 @@ public class PlasmaLayer {
     private ArrayList<PlasmaSpecies> plasmaSpecies = new ArrayList<>();
 
     // Ion Temperature radial profile define between [rMin, rMax] (keV)
-    // Internally, nodes are mapped to the normalized units of [0, 1]
+    // Internally, binEdges are mapped to the normalized units of [0, 1]
     private PolynomialSplineFunction ionTemperature;
 
     // Electron Temperature radial profile defined between [rMin, rMax] (keV)
-    // Internally, nodes are mapped to the normalized units of [0, 1]
+    // Internally, binEdges are mapped to the normalized units of [0, 1]
     private PolynomialSplineFunction electronTemperature;
 
     // Mass density radial profile defined between [rMin, rMax] (keV)
-    // Internally, nodes are mapped to the normalized units of [0, 1]
+    // Internally, binEdges are mapped to the normalized units of [0, 1]
     private PolynomialSplineFunction massDensity;
 
 
@@ -69,16 +69,31 @@ public class PlasmaLayer {
      */
 
     // Profile defined by T(r) = T and \rho(r) = \rho
-    public static PlasmaLayer uniformPlasma(double P0, double totalMass, double burnT){
-        return uniformPlasma(P0, totalMass, burnT, 1.0);
+    public static PlasmaLayer UniformPlasmaOfKnownTotalMass(double P0, double totalMass, double burnT){
+        return UniformPlasmaOfKnownTotalMass(P0, totalMass, burnT, 1.0);
     }
 
-    public static PlasmaLayer uniformPlasma(double P0, double totalMass, double burnT, double TeFraction){
+    public static PlasmaLayer UniformPlasmaOfKnownTotalMass(double P0, double totalMass, double burnT, double TeFraction){
         double[] uniformArray = Utils.linspace(1, 1, NUM_PROFILE_POINTS);
 
         PlasmaLayer plasma = new PlasmaLayer(uniformArray, uniformArray, uniformArray);
         plasma.setOuterP0(P0);
         plasma.setTotalMass(totalMass);
+        plasma.setDDnBurnAveragedIonTemperature(burnT);
+        plasma.setElectronTemperatureFraction(TeFraction);
+        return plasma;
+    }
+
+    public static PlasmaLayer UniformPlasmaOfKnownMassDensity(double P0, double massDensity, double burnT){
+        return UniformPlasmaOfKnownMassDensity(P0, massDensity, burnT, 1.0);
+    }
+
+    public static PlasmaLayer UniformPlasmaOfKnownMassDensity(double P0, double massDensity, double burnT, double TeFraction){
+        double[] uniformArray = Utils.linspace(1, 1, NUM_PROFILE_POINTS);
+
+        PlasmaLayer plasma = new PlasmaLayer(uniformArray, uniformArray, uniformArray);
+        plasma.setOuterP0(P0);
+        plasma.multiplyMassDensityByScalar(massDensity);
         plasma.setDDnBurnAveragedIonTemperature(burnT);
         plasma.setElectronTemperatureFraction(TeFraction);
         return plasma;
@@ -144,6 +159,12 @@ public class PlasmaLayer {
      * Generic constructor methods
      */
 
+    public PlasmaLayer(double[] radiusNodes, double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
+        this.ionTemperature = new SplineInterpolator().interpolate(radiusNodes, ionTemperature);
+        this.electronTemperature = new SplineInterpolator().interpolate(radiusNodes, electronTemperature);
+        this.massDensity = new SplineInterpolator().interpolate(radiusNodes, massDensity);
+    }
+
     public PlasmaLayer(double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
         double[] r = Utils.linspace(0, 1, ionTemperature.length);
 
@@ -199,7 +220,7 @@ public class PlasmaLayer {
      */
     double[] getStoppingPower(ParticleType testParticle, double energy){
 
-        double[] r = getRadiusNodes();                  // Normalized radius [0, 1]
+        double[] r = getNormalizedRadiusNodes();                  // Normalized radius [0, 1]
         double[] dEdx = new double[r.length];           // Stopping power array
 
 
@@ -239,15 +260,19 @@ public class PlasmaLayer {
             //        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
             //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getEnergy());
 
-            StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getMass(), testParticle.getZ(),
-                    speciesAs, speciesZs, speciesTs, speciesNs, Te);
-            dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(energy);
+            if (testParticle.getZ() == 0){
+                dEdx[i] = 0.0;
+            }else {
+                StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getMass(), testParticle.getZ(),
+                        speciesAs, speciesZs, speciesTs, speciesNs, Te);
+                dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(energy);
+            }
         }
 
         return dEdx;
     }
 
-    public double[] getRadiusNodes(){
+    public double[] getNormalizedRadiusNodes(){
         return massDensity.getKnots();
     }
 
@@ -277,6 +302,30 @@ public class PlasmaLayer {
             radius += mode.evaluate(theta, phi);
         }
         return radius;
+    }
+
+    public double[] getRadiusNodes(double theta, double phi){
+        double[] rN = getNormalizedRadiusNodes();
+        double rMin = getInnerRadiusBound(theta, phi);
+        double rMax = getOuterRadiusBound(theta, phi);
+
+        double[] r = new double[rN.length];
+        for (int i = 0; i < rN.length; i++){
+            r[i] = rMin + (rMax - rMin)*rN[i];
+        }
+
+        return r;
+    }
+
+    public double getArealDensity(double theta, double phi){
+        TrapezoidIntegrator integrator = new TrapezoidIntegrator();
+        double value = integrator.integrate(Integer.MAX_VALUE, massDensity, 0, 1);
+
+        double Rmin = getInnerRadiusBound(theta, phi);
+        double Rmax = getOuterRadiusBound(theta, phi);
+
+        // We have to multiply by this normalization factor since the profiles are defined in normalized radius
+        return (Rmax - Rmin) * value;
     }
 
     public double getIonTemperature(Vector3D position){
@@ -345,9 +394,15 @@ public class PlasmaLayer {
         return getReactivity(r, Reactivity.DDn_Reactivity);
     }
 
+    public double getDDpReactivity(Vector3D r){
+        return getReactivity(r, Reactivity.DDp_Reactivity);
+    }
+
     public double getD3HepReactivity(Vector3D r){
         return getReactivity(r, Reactivity.D3Hep_Reactivity);
     }
+
+    public double get3He3HepReactivity(Vector3D r){ return getReactivity(r, Reactivity.He3He3_Reactivity); }
 
     public double getMassDensity(Vector3D position){
         double[] coordinates = Utils.getSphericalFromVector(position);
@@ -412,6 +467,26 @@ public class PlasmaLayer {
         return false;
     }
 
+    public Particle moveInside(Particle particle){
+        if (this.getIsInside(particle.getPosition())){
+            return particle;
+        }
+
+        double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
+        double theta = coordinates[1];
+        double phi   = coordinates[2];
+
+        double radius;
+        if (this.getIsCloserToOuterBoundary(particle.getPosition())){
+            radius = getOuterRadiusBound(theta, phi);
+        }else{
+            radius = getInnerRadiusBound(theta, phi);
+        }
+
+        particle.setPosition(Utils.getVectorFromSpherical(radius, theta, phi));
+        return particle;
+    }
+
     public boolean getIsCloserToOuterBoundary(Vector3D r){
         double[] coordinates = Utils.getSphericalFromVector(r);
         double theta = coordinates[1];
@@ -438,6 +513,11 @@ public class PlasmaLayer {
         return volumeIntegral("getMassDensity");
     }
 
+
+    /**
+     * Volume averaged temperatures
+     */
+
     public double getVolumeAverageIonTemperature(){
         return volumeIntegral("getIonTemperature") / getTotalVolume();
     }
@@ -446,21 +526,95 @@ public class PlasmaLayer {
         return volumeIntegral("getElectronTemperature") / getTotalVolume();
     }
 
-    // Get average Tion weighted by rho^2 <sigmaV>
+
+    /**
+     * "Burn rates" (in silly units of rho^2 <sigmaV>)
+     * TODO: Does NOT account for double counting. Should only be used for relative scaling purposes
+     */
+
+    public double getBurnRate(String reactivityMethodName){
+        return volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName);
+    }
+
+    public double getDDnBurnRate(){
+        return getBurnRate("getDDnReactivity");
+    }
+
+    public double getDDpBurnRate(){
+        return getBurnRate("getDDpReactivity");
+    }
+
+    public double getD3HepBurnRate(){
+        return getBurnRate("getD3HepReactivity");
+    }
+
+    public double get3He3HeBurnRate(){
+        return getBurnRate("get3He3HepReactivity");
+    }
+
+
+    /**
+     * Burn averaged ion temperatures (rho^2 <sigmaV> weighted integrals)
+     */
+
     public double getBurnAveragedIonTemperature(String reactivityMethodName){
         double numerator   = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName, "getIonTemperature");
         double denominator = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName);
         return  numerator / denominator;
-
     }
 
+    // DD-n
     public double getDDnBurnAveragedIonTemperature(){
         return getBurnAveragedIonTemperature("getDDnReactivity");
     }
 
+    // DD-p
+    public double getDDpBurnAveragedIonTemperature(){
+        return getBurnAveragedIonTemperature("getDDpReactivity");
+    }
+
+    // D3He-p
     public double getD3HepBurnAveragedIonTemperature(){
         return getBurnAveragedIonTemperature("getD3HepReactivity");
     }
+
+    //3He3He-p
+    public double get3He3HepBurnAveragedIonTemperature(){ return getBurnAveragedIonTemperature("get3He3HepReactivity"); }
+
+
+    /**
+     * Burn averaged electron temperatures (rho^2 <sigmaV> weighted integrals)
+     */
+
+    public double getBurnAveragedElectronTemperature(String reactivityMethodName){
+        double numerator   = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName, "getElectronTemperature");
+        double denominator = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName);
+        return  numerator / denominator;
+    }
+
+    // DD-n
+    public double getDDnBurnAveragedElectronTemperature(){
+        return getBurnAveragedElectronTemperature("getDDnReactivity");
+    }
+
+    // DD-p
+    public double getDDpBurnAveragedElectronTemperature(){
+        return getBurnAveragedElectronTemperature("getDDpReactivity");
+    }
+
+    // D3He-p
+    public double getD3HepBurnAveragedElectronTemperature(){
+        return getBurnAveragedElectronTemperature("getD3HepReactivity");
+    }
+
+    //3He3He-p
+    public double get3He3HepBurnAveragedElectronTemperature(){
+        return getBurnAveragedElectronTemperature("get3He3HepReactivity");
+    }
+
+
+
+
 
 
     /**
@@ -479,8 +633,12 @@ public class PlasmaLayer {
         return getSpatialBurnDistribution(Reactivity.D3Hep_Reactivity);
     }
 
+    public Distribution getSpatial3He3HepBurnDistribution(){
+        return getSpatialBurnDistribution(Reactivity.He3He3_Reactivity);
+    }
+
     public Distribution getSpatialBurnDistribution(Reactivity reactivity){
-        double[] r = getRadiusNodes();                  // Normalized r
+        double[] r = getNormalizedRadiusNodes();                  // Normalized r
         double[] Y = new double[r.length];              // Yield probability
 
         for (int i = 0; i < r.length; i++){
@@ -605,7 +763,7 @@ public class PlasmaLayer {
     public String toString(){
         String string = " r (norm)  | rho (g/cc) |  Ti (keV)  |  Te (keV)\n";
 
-        double[] r = getRadiusNodes();
+        double[] r = getNormalizedRadiusNodes();
         for (int i = 0; i < r.length; i++){
             string += String.format("%.4e | %.4e | %.4e | %.4e\n", r[i], massDensity.value(r[i]),
                     ionTemperature.value(r[i]), electronTemperature.value(r[i]));
@@ -806,28 +964,28 @@ public class PlasmaLayer {
 
                     for (int i = 0; i < NUM_RADIUS_NODES; i++) {
 
-                        // Determine the radius nodes corresponding to theta_1, phi_1
+                        // Determine the radius binEdges corresponding to theta_1, phi_1
                         double r_111 = rMin_11 + (i + 1) * (rMax_11 - rMin_11) / NUM_RADIUS_NODES;
                         double r_011 = rMin_11 + (i + 0) * (rMax_11 - rMin_11) / NUM_RADIUS_NODES;
                         double dR_11 = (r_111 - r_011);
 
-                        // Determine the radius nodes corresponding to theta_1, phi_0
+                        // Determine the radius binEdges corresponding to theta_1, phi_0
                         double r_110 = rMin_10 + (i + 1) * (rMax_10 - rMin_10) / NUM_RADIUS_NODES;
                         double r_010 = rMin_10 + (i + 0) * (rMax_10 - rMin_10) / NUM_RADIUS_NODES;
                         double dR_10 = (r_110 - r_010);
 
-                        // Determine the radius nodes corresponding to theta_0, phi_1
+                        // Determine the radius binEdges corresponding to theta_0, phi_1
                         double r_101 = rMin_01 + (i + 1) * (rMax_01 - rMin_01) / NUM_RADIUS_NODES;
                         double r_001 = rMin_01 + (i + 0) * (rMax_01 - rMin_01) / NUM_RADIUS_NODES;
                         double dR_01 = (r_101 - r_001);
 
-                        // Determine the radius nodes corresponding to theta_0, phi_0
+                        // Determine the radius binEdges corresponding to theta_0, phi_0
                         double r_100 = rMin_00 + (i + 1) * (rMax_00 - rMin_00) / NUM_RADIUS_NODES;
                         double r_000 = rMin_00 + (i + 0) * (rMax_00 - rMin_00) / NUM_RADIUS_NODES;
                         double dR_00 = (r_100 - r_000);
 
 
-                        // Create a vector for all 8 nodes
+                        // Create a vector for all 8 binEdges
                         Vector3D vec_111 = Utils.getVectorFromSpherical(r_111, theta_1, phi_1);
                         Vector3D vec_011 = Utils.getVectorFromSpherical(r_011, theta_1, phi_1);
 

@@ -41,6 +41,10 @@ public class NuclearReaction {
 
     public Particle getProductParticle(Particle A, Particle B, Vector3D direction){
 
+        if (direction == null){
+            return getProductParticle(A, B);
+        }
+
         // Reduced mass of these two particles in amu
         double reducedMass = A.getMass()*B.getMass() / (A.getMass() + B.getMass());
 
@@ -79,7 +83,7 @@ public class NuclearReaction {
 
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
-        Particle productParticle = new Particle(productOfInterest, A.getPosition(), direction, productEnergy_Lab);
+        Particle productParticle = new Particle(productOfInterest, A.getPosition(), direction, productEnergy_Lab, A.getTime());
 
         return productParticle;
     }
@@ -112,8 +116,8 @@ public class NuclearReaction {
         Vector3D productVelocity_CoM = Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
         Vector3D productVelocity_Lab = centerOfMassVelocity.add(productVelocity_CoM);
         double productSpeed_Lab = productVelocity_Lab.getNorm();
-        double productEnergy_Lab = 0.5*MonteCarloParticleTracer.Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
-        MonteCarloParticleTracer.Particle productParticle = new MonteCarloParticleTracer.Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab);
+        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+        Particle productParticle = new Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab, A.getTime());
 
 
         return productParticle;
@@ -169,6 +173,25 @@ public class NuclearReaction {
      * Private convenience functions
      */
 
+    public boolean equals(Object o){
+        if (o == this) return true;
+        if (!(o instanceof NuclearReaction)) return false;
+
+        NuclearReaction reaction = (NuclearReaction) o;
+        return reactantParticleTypeA.equals(reaction.getReactantParticleTypeA())
+                && reactantParticleTypeB.equals(reaction.getReactantParticleTypeB())
+                && productOfInterest.equals(reaction.getProductOfInterest())
+                && otherProduct.equals(reaction.getOtherProduct());
+    }
+
+    // We'll use ZAID as our unique hash identifier
+    public int hashCode(){
+        return reactantParticleTypeA.hashCode() +
+                reactantParticleTypeB.hashCode() +
+                productOfInterest.hashCode() +
+                otherProduct.hashCode();
+    }
+
     private void generateCrossSectionFunction(File dataFile){
 
         ArrayList<Double> E = new ArrayList<>();
@@ -200,6 +223,15 @@ public class NuclearReaction {
         centerOfMassVelocity = centerOfMassVelocity.add(B.getVelocity().scalarMultiply(B.getMass()));   // mA*vA + mB*vB
         centerOfMassVelocity = centerOfMassVelocity.scalarMultiply(1.0/(A.getMass() + B.getMass()));    // mA*vA + mB*vB / (mA + mB)
         return centerOfMassVelocity;
+    }
+
+    public String toString(){
+        return String.format("%s + %s -> %s + %s (%.2f MeV)",
+                reactantParticleTypeA.toString(),
+                reactantParticleTypeB.toString(),
+                productOfInterest.toString(),
+                otherProduct.toString(),
+                energyReleased);
     }
 
 

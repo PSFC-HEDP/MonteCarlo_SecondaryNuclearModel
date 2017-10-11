@@ -112,7 +112,8 @@ public class ParticleDistribution {
         double energy = energyDistribution.sample();
 
         // Return the MonteCarloParticleTracer.Particle Object
-        Particle particle = new Particle(getZ(), getMass(), position, direction, energy);
+
+        Particle particle = new Particle(getZ(), getMass(), position, direction, energy, 0.0);
         particle.setWeight(particleWeight);
         return particle;
     }
@@ -140,11 +141,12 @@ public class ParticleDistribution {
 
     public String toString(){
         String string = "";
-        string += "         Radial MonteCarloParticleTracer.Distribution        \n";
+        string += "Particle type: " + type.toString() + "\n";
+        string += "         Radial Distribution        \n";
         string += "------------------------------------\n";
         string += radialDistribution.toString();
         string += "\n";
-        string += "         Energy MonteCarloParticleTracer.Distribution        \n";
+        string += "         Energy Distribution        \n";
         string += "------------------------------------\n";
         string += energyDistribution.toString();
         return string;

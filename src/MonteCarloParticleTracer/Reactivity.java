@@ -16,6 +16,8 @@ public class Reactivity {
     final static Reactivity DDn_Reactivity = ddn();
     final static Reactivity DDp_Reactivity = ddp();
     final static Reactivity D3Hep_Reactivity = d3Hep();
+    final static Reactivity He3He3_Reactivity = he3he3();
+
 
 
     private PolynomialSplineFunction value;
@@ -30,6 +32,10 @@ public class Reactivity {
 
     private static Reactivity d3Hep(){
         return new Reactivity(Utils.D3Hep_REACTIVITY_FILE);
+    }
+
+    private static Reactivity he3he3() {
+        return new Reactivity((Utils.He3He3_REACTIVITY_FILE));
     }
 
     public Reactivity(String dataFilename){

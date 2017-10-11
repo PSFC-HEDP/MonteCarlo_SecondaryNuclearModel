@@ -2,13 +2,13 @@ package MonteCarloParticleTracer;
 
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolatingFunction;
 import org.apache.commons.math3.analysis.interpolation.BicubicInterpolator;
-import org.apache.commons.math3.util.FastMath;
 
 /**
  * Created by lahmann on 2017-03-01.
  */
 public class StoppingPowerModel {
 
+    final double MAXIMUM_STOPPING_POWER_ENERGY = 20.0;
     final double MINIMUM_STOPPING_POWER_ENERGY = Utils.MINIMUM_LI_PETRASSO_ENERGY_MeV;       // MeV
     final int NUM_ENERGY_NODES = 200;
 
@@ -17,15 +17,14 @@ public class StoppingPowerModel {
     private double[] energyNodes;
 
 
-    public StoppingPowerModel(ParticleDistribution particleDistribution, PlasmaLayer plasmaLayer){
+    public StoppingPowerModel(ParticleType particleType, PlasmaLayer plasmaLayer){
 
-        final double maxEnergy = particleDistribution.getMaxEnergy();
         energyNodes = new double[NUM_ENERGY_NODES+1];
-        radiusNodes = plasmaLayer.getRadiusNodes();
+        radiusNodes = plasmaLayer.getNormalizedRadiusNodes();
 
 
         energyNodes[0] = 0.0;
-        double[] temp = Utils.linspace(MINIMUM_STOPPING_POWER_ENERGY, maxEnergy, NUM_ENERGY_NODES);
+        double[] temp = Utils.linspace(MINIMUM_STOPPING_POWER_ENERGY, MAXIMUM_STOPPING_POWER_ENERGY, NUM_ENERGY_NODES);
         for (int i = 1; i < energyNodes.length; i++){
             energyNodes[i] = temp[i-1];
         }
@@ -33,7 +32,7 @@ public class StoppingPowerModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 1; i < energyNodes.length; i++){
-            dEdx[i] = plasmaLayer.getStoppingPower(particleDistribution.getType(), energyNodes[i]);
+            dEdx[i] = plasmaLayer.getStoppingPower(particleType, energyNodes[i]);
         }
 
 
@@ -50,16 +49,12 @@ public class StoppingPowerModel {
     }
 
     public double evaluate(double energy, double radius){
-        if (function.isValidPoint(energy, radius)){
-            return function.value(energy, radius);
-        }else{
-            radius = FastMath.max(radius, radiusNodes[0]);
-            radius = FastMath.min(radius, radiusNodes[radiusNodes.length-1]);
+        if (radius < radiusNodes[0])                        radius = radiusNodes[0];
+        if (radius > radiusNodes[radiusNodes.length - 1])   radius = radiusNodes[radiusNodes.length - 1];
 
-            energy = FastMath.max(energy, energyNodes[0]);
-            energy = FastMath.min(energy, energyNodes[radiusNodes.length-1]);
+        if (energy < energyNodes[0])                        energy = energyNodes[0];
+        if (energy > energyNodes[energyNodes.length - 1])   energy = energyNodes[energyNodes.length - 1];
 
-            return function.value(energy, radius);
-        }
+        return function.value(energy, radius);
     }
 }
