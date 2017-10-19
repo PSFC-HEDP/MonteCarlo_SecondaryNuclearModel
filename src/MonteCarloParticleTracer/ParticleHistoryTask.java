@@ -36,8 +36,6 @@ public class ParticleHistoryTask implements RunnableFuture {
 
     private boolean debugMode = false;
 
-
-
     private Double taskReactionProbability = 0.0;
 
     /**
@@ -91,16 +89,9 @@ public class ParticleHistoryTask implements RunnableFuture {
             traceThroughPlasma(particle, startingLayerIndex, sourceParticlePositionTallies,
                     sourceParticleEnergyTallies, sourceParticleTimeTallies);
 
-            /**
-            particle.multiplyWeight(particleReactionProb);
-            taskReactionProbability += particle.getWeight();
-             */
         }
 
-        /**
-        // We need to re-normalize the energy tally due to the ad hoc weighting we do
-        energyTally.setSum(taskReactionProbability);
-         */
+
     }
 
 
@@ -131,19 +122,26 @@ public class ParticleHistoryTask implements RunnableFuture {
 
             // Trace the particle through the current layer
             particle = traceThroughPlasmaLayer(particle, currentLayerIndex);
+            double weight = particle.getWeight();
+            double bias   = weight;
+
+            // TODO: Adhoc weighting
+            if (detectorLineOfSight != null) {
+                bias *= particle.getEnergy();
+            }
 
             // If the particle is dead, we're done
             if (particle.getEnergy() <= 0) {
                 finished = true;
             }
 
-            // Check to see if we're near the outer boundary
+            // Else, check to see if we're near the outer boundary
             else if (currentLayerData.layer.getIsCloserToOuterBoundary(particle.getPosition())) {
 
                 // Tally this particle as crossing the outer surface (+1 is because we're using the 0th index)
-                positionTallies[currentLayerIndex+1].addValue(particle.getPosition().getNorm(), particle.getWeight());
-                energyTallies  [currentLayerIndex+1].addValue(particle.getEnergy()            , particle.getWeight());
-                timeTallies    [currentLayerIndex+1].addValue(particle.getTime()              , particle.getWeight());
+                positionTallies[currentLayerIndex+1].addBiasedValue(particle.getPosition().getNorm(), bias, weight);
+                energyTallies  [currentLayerIndex+1].addBiasedValue(particle.getEnergy()            , bias, weight);
+                timeTallies    [currentLayerIndex+1].addBiasedValue(particle.getTime()              , bias, weight);
 
                 // If so, and this is the last layer we're done
                 if (currentLayerIndex == layerDataList.size() - 1) {
@@ -164,9 +162,9 @@ public class ParticleHistoryTask implements RunnableFuture {
             else {
 
                 // Tally this particle as crossing the outer surface of the previous layer (there's a +1 and a -1 that cancel out in the indexing)
-                positionTallies[currentLayerIndex].addValue(particle.getPosition().getNorm(), particle.getWeight());
-                energyTallies  [currentLayerIndex].addValue(particle.getEnergy()            , particle.getWeight());
-                timeTallies    [currentLayerIndex].addValue(particle.getTime()              , particle.getWeight());
+                positionTallies[currentLayerIndex].addBiasedValue(particle.getPosition().getNorm(), bias, weight);
+                energyTallies  [currentLayerIndex].addBiasedValue(particle.getEnergy()            , bias, weight);
+                timeTallies    [currentLayerIndex].addBiasedValue(particle.getTime()              , bias, weight);
 
                 currentLayerIndex--;
                 currentLayerData = layerDataList.get(currentLayerIndex);
@@ -308,7 +306,7 @@ public class ParticleHistoryTask implements RunnableFuture {
                  // TODO: The multiplying by energy is an adhoc way to account for the non-isotropic lab frame distribution
                  // TODO: I don't currently have a justification for why it works beyond the fact that others have done this in the past
                 if (detectorLineOfSight != null) {
-                    productParticle.multiplyWeight(productParticle.getEnergy());
+                    //productParticle.multiplyWeight(productParticle.getEnergy());
                 }
 
                 // Grab the tallies for this product
@@ -453,7 +451,7 @@ public class ParticleHistoryTask implements RunnableFuture {
                     Particle backgroundParticle = new Particle(reactionData.backgroundParticle, 0.0);
                     Particle maxEnergyProductParticle = nuclearReaction.getMaxEnergyProductParticle(maxEnergySourceParticle, backgroundParticle);
 
-                    double maxProductEnergy = maxEnergyProductParticle.getEnergy();
+                    double maxProductEnergy = 1.1*maxEnergyProductParticle.getEnergy();
                     int numProductNodes = (int) Math.ceil(maxProductEnergy / ENERGY_NODE_WIDTH);
                     double[] productNodes = Utils.linspace(0.0, maxProductEnergy, numProductNodes);
 

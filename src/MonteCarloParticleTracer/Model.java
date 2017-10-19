@@ -55,10 +55,10 @@ public class Model {
 
     public void runSimulation(int totalParticles, int numCPUs) throws Exception{
 
-        // Sanity check the number of requested binEdges
+        // Sanity check the number of requested CPUs
         if (numCPUs > Runtime.getRuntime().availableProcessors()){
-            System.err.printf("Warning! The user requested %d binEdges when only %d are available.\n" +
-                            "Changing requested number of binEdges to %d.\n",
+            System.err.printf("Warning! The user requested %d nodes when only %d are available on this machine.\n" +
+                            "Changing requested number of nodes to %d.\n",
                     numCPUs, Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors());
             numCPUs = Runtime.getRuntime().availableProcessors();
         }
@@ -115,8 +115,8 @@ public class Model {
 
 
             // Easier for debugging if we run the task in this thread
-            //tasks[i].setDebugMode(true);
-            //tasks[i].run();
+            tasks[i].setDebugMode(true);
+            tasks[i].run();
 
 
             // Make a note in the output file
@@ -233,6 +233,9 @@ public class Model {
 
             for (int i = 0; i < productParticlePositionTallies.length; i++) {
 
+                // TODO: TEMP LAZY
+                System.out.printf(" %.4e", productParticleEnergyTallies[i].getTotalWeight());
+
                 if (i == 0) {
                     w.write("Birth Position Tally\n");
                     w.write(productParticlePositionTallies[i] + "\n");
@@ -251,6 +254,7 @@ public class Model {
             }
         }
 
+        System.out.println();
         w.close();
     }
 
