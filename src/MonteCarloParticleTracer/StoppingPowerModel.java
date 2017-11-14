@@ -17,10 +17,10 @@ public class StoppingPowerModel {
     private double[] energyNodes;
 
 
-    public StoppingPowerModel(ParticleType particleType, PlasmaLayer plasmaLayer){
+    public StoppingPowerModel(ParticleType particleType, Plasma plasma){
 
         energyNodes = new double[NUM_ENERGY_NODES+1];
-        radiusNodes = plasmaLayer.getNormalizedRadiusNodes();
+        radiusNodes = plasma.getNormalizedRadiusNodes();
 
 
         energyNodes[0] = 0.0;
@@ -32,7 +32,7 @@ public class StoppingPowerModel {
 
         double[][] dEdx = new double[energyNodes.length][radiusNodes.length];
         for (int i = 1; i < energyNodes.length; i++){
-            dEdx[i] = plasmaLayer.getStoppingPower(particleType, energyNodes[i]);
+            dEdx[i] = plasma.getStoppingPower(particleType, energyNodes[i]);
         }
 
 

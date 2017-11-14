@@ -11,7 +11,7 @@ import java.util.HashMap;
  * Created by lahmann on 2016-06-19.
  *
  * Class the holds all of the information required to sample particles from some ParticleDistribution
- * and track them through some PlasmaLayer. The actual step by step logic of the simulation is handled within
+ * and track them through some Plasma. The actual step by step logic of the simulation is handled within
  * individual ParticleHistoryTasks, this class just initiates them
  *
  */
@@ -19,9 +19,10 @@ public class Model {
 
     private File outputFile;
 
-    private ParticleDistribution sourceParticleDistribution;
+    private NuclearReaction sourceNuclearReaction;
+    private Reactivity sourceReactivity;
 
-    private ArrayList<PlasmaLayer> plasmaLayers = new ArrayList<>();
+    private ArrayList<Plasma> plasmas = new ArrayList<>();
     private ArrayList<NuclearReaction> nuclearReactions = new ArrayList<>();
 
     private Vector3D detectorLineOfSight;
@@ -30,23 +31,24 @@ public class Model {
         this.outputFile = outputFile;
     }
 
-    public void addPlasmaLayer(PlasmaLayer plasmaLayer){
+    public void setSourceInformation(NuclearReaction sourceNuclearReaction, Reactivity sourceReactivity) {
+        this.sourceNuclearReaction = sourceNuclearReaction;
+        this.sourceReactivity = sourceReactivity;
+    }
+
+    public void addPlasmaLayer(Plasma plasma){
 
         // Force the new layer to share a boundary with the out most layer
-        if (plasmaLayers.size() > 0){
-            PlasmaLayer outerMostLayer = plasmaLayers.get(plasmaLayers.size() - 1);
-            plasmaLayer.setInnerBoundaryLegendreModes(outerMostLayer.getOuterBoundaryLegendreModes());
+        if (plasmas.size() > 0){
+            Plasma outerMostLayer = plasmas.get(plasmas.size() - 1);
+            plasma.setInnerBoundaryLegendreModes(outerMostLayer.getOuterBoundaryLegendreModes());
         }
 
-        plasmaLayers.add(plasmaLayer);
+        plasmas.add(plasma);
     }
 
     public void addNuclearReaction(NuclearReaction reaction){
         nuclearReactions.add(reaction);
-    }
-
-    public void setSourceParticleDistribution(ParticleDistribution sourceParticleDistribution) {
-        this.sourceParticleDistribution = sourceParticleDistribution;
     }
 
     public void setDetectorLineOfSight(Vector3D detectorLineOfSight) {
@@ -71,17 +73,14 @@ public class Model {
         FileWriter w = new FileWriter(outputFile);
 
         // Write the plasma information
-        for (int i = 0; i < plasmaLayers.size(); i++){
+        for (int i = 0; i < plasmas.size(); i++){
             w.write("Plasma Layer " + i + "\n");
-            w.write(plasmaLayers.get(i).toString() + "\n");
+            w.write(plasmas.get(i).toString() + "\n");
         }
 
-        // Normalize the distribution
-        sourceParticleDistribution.setParticleWeight(1.0 / totalParticles);
-
         // Write the source distribution to the output file
-        w.write("Source Particle Distribution" + "\n");
-        w.write(sourceParticleDistribution.toString() + "\n");
+        w.write("Source Particle Nuclear Reaction" + "\n");
+        w.write(sourceNuclearReaction.toString() + "\n");
 
         // Write all of the modeled nuclear reactions to the output file
         for (int i = 0; i < nuclearReactions.size(); i++){
@@ -103,20 +102,21 @@ public class Model {
 
 
             // Create the task
-            tasks[i] = new ParticleHistoryTask(sourceParticleDistribution, particlesForTask);
+            tasks[i] = new ParticleHistoryTask(particlesForTask);
+            tasks[i].setSourceInformation(plasmas.get(0), sourceReactivity, sourceNuclearReaction);     // TODO: Assumes the source plasma
             tasks[i].setDetectorLineOfSight(detectorLineOfSight);
 
 
             // Sort out all of the data Objects on initiation so we don't have to do it during runtime
-            for (PlasmaLayer layer : plasmaLayers){
+            for (Plasma layer : plasmas){
                 LayerData data = buildLayerData(layer);
                 tasks[i].addPlasmaLayer(data);
             }
 
 
             // Easier for debugging if we run the task in this thread
-            tasks[i].setDebugMode(true);
-            tasks[i].run();
+            //tasks[i].setDebugMode(true);
+            //tasks[i].run();
 
 
             // Make a note in the output file
@@ -261,10 +261,10 @@ public class Model {
     /**
      * Private convenience functions
      */
-    private LayerData buildLayerData(PlasmaLayer plasmaLayer){
+    private LayerData buildLayerData(Plasma plasma){
 
-        LayerData layerData = new LayerData(plasmaLayer);
-        ParticleType sourceParticle = sourceParticleDistribution.getType();
+        LayerData layerData = new LayerData(plasma);
+        ParticleType sourceParticle = sourceNuclearReaction.getProducts()[0];
 
         // Build the stopping power model for the source particles
         layerData.addStoppingPowerModel(sourceParticle);
@@ -273,21 +273,21 @@ public class Model {
         for (int i = 0; i < nuclearReactions.size(); i++){
 
             NuclearReaction reaction = nuclearReactions.get(i);
-            ParticleType productParticle = reaction.getProductOfInterest();
+            ParticleType productParticle = reaction.getProducts()[0];
 
             // Build the stopping power model for the product of this reaction
             layerData.addStoppingPowerModel(productParticle);
 
             // Determine which of the reactions can be set off by the source particles
-            if (sourceParticle.equals(reaction.getReactantParticleTypeA())){
-                if (plasmaLayer.containsSpecies(reaction.getReactantParticleTypeB())){
-                    layerData.addReactionData(reaction, sourceParticle, reaction.getReactantParticleTypeB());
-                }
+            ParticleType A = reaction.getReactants()[0];
+            ParticleType B = reaction.getReactants()[1];
+
+            if (sourceParticle.equals(A) && plasma.containsSpecies(B)){
+                layerData.addReactionData(reaction, A, B);
             }
-            else if (sourceParticle.equals(reaction.getReactantParticleTypeB())){
-                if (plasmaLayer.containsSpecies(reaction.getReactantParticleTypeA())){
-                    layerData.addReactionData(reaction, sourceParticle, reaction.getReactantParticleTypeA());
-                }
+
+            else if (sourceParticle.equals(B) && plasma.containsSpecies(A)){
+                layerData.addReactionData(reaction, B, A);
             }
 
             /**
@@ -302,11 +302,11 @@ public class Model {
 
     public class LayerData{
 
-        PlasmaLayer layer;
+        Plasma layer;
         HashMap<ParticleType, StoppingPowerModel> stoppingPowerModels = new HashMap<>();
         HashMap<ParticleType, ArrayList<ReactionData>> reactionDataMap = new HashMap<>();
 
-        public LayerData(PlasmaLayer layer) {
+        public LayerData(Plasma layer) {
             this.layer = layer;
         }
 

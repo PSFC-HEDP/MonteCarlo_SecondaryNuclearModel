@@ -12,38 +12,60 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
- * Handles a nuclear reaction // A + B -> C + D
+ * Class that handles a 2 body nuclear reaction A + B -> C + D
  */
 public class NuclearReaction {
 
-    private ParticleType reactantParticleTypeA;
-    private ParticleType reactantParticleTypeB;
+    private ParticleType[] reactants;       // Reacting particles
+    private ParticleType[] products;        // Resulting products
 
-    private ParticleType productOfInterest;
-    private ParticleType otherProduct;
+    private PolynomialSplineFunction crossSection;      // Function representing the XS in cm^2 as a function of CoM energy in MeV
 
-    private double energyReleased;      // Q value
+    public static final NuclearReaction DD_t   = new NuclearReaction(ParticleType.deuteron, ParticleType.deuteron, ParticleType.triton, ParticleType.proton);
+    public static final NuclearReaction DD_3He = new NuclearReaction(ParticleType.deuteron, ParticleType.deuteron, ParticleType.helium3, ParticleType.neutron);
 
-    private PolynomialSplineFunction crossSection;
+    public static final NuclearReaction DT_n = new NuclearReaction(ParticleType.deuteron, ParticleType.triton, ParticleType.neutron, ParticleType.alpha, DataFiles.DT_XS_File);
+    public static final NuclearReaction D3He_p = new NuclearReaction(ParticleType.deuteron, ParticleType.helium3, ParticleType.proton, ParticleType.alpha, DataFiles.D3He_XS_File);
 
-    public static final NuclearReaction DTn   = new NuclearReaction(ParticleType.deuteron, ParticleType.triton, ParticleType.neutron, ParticleType.alpha, Constants.DT_N_ENERGY_RELEASE, Utils.DT_ENDF_XS_FILE);
-    public static final NuclearReaction D3Hep = new NuclearReaction(ParticleType.deuteron, ParticleType.helium3, ParticleType.proton, ParticleType.alpha, Constants.D3HE_P_ENERGY_RELEASE, Utils.D3He_ENDF_XS_FILE);
+    public NuclearReaction(ParticleType A, ParticleType B, ParticleType C, ParticleType D, File crossSectionFile) {
 
-    public NuclearReaction(ParticleType A, ParticleType B, ParticleType productOfInterest, ParticleType otherProduct, double Q, String crossSectionFile) {
-        this.reactantParticleTypeA = A;
-        this.reactantParticleTypeB = B;
-        this.productOfInterest = productOfInterest;
-        this.otherProduct = otherProduct;
-        this.energyReleased = Q;
+        // Set the reactants
+        this.reactants = new ParticleType[2];
+        this.reactants[0] = A;
+        this.reactants[1] = B;
 
-        generateCrossSectionFunction(new File(crossSectionFile));
+        // Set the products
+        this.products = new ParticleType[2];
+        this.products[0] = C;
+        this.products[1] = D;
+
+        this.crossSection = generateCrossSectionFunction(crossSectionFile);
     }
 
+    public NuclearReaction(ParticleType A, ParticleType B, ParticleType C, ParticleType D) {
+
+        // Set the reactants
+        this.reactants = new ParticleType[2];
+        this.reactants[0] = A;
+        this.reactants[1] = B;
+
+        // Set the products
+        this.products = new ParticleType[2];
+        this.products[0] = C;
+        this.products[1] = D;
+
+    }
+
+    // TODO: This assumes 2 body
     public Particle getProductParticle(Particle A, Particle B, Vector3D direction){
 
         if (direction == null){
             return getProductParticle(A, B);
         }
+
+        // Rename products for readability
+        ParticleType C = this.products[0];      // The returned product
+        ParticleType D = this.products[1];      // The other product
 
         // Reduced mass of these two particles in amu
         double reducedMass = A.getMass()*B.getMass() / (A.getMass() + B.getMass());
@@ -58,10 +80,10 @@ public class NuclearReaction {
         Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
 
         // Center of mass energy of the product of interest in MeV
-        double productEnergy_CoM = (otherProduct.getMass() / (productOfInterest.getMass() + otherProduct.getMass())) * (energyReleased + kineticEnergy);
+        double productEnergy_CoM = (D.getMass() / (C.getMass() + D.getMass())) * (getQValue() + kineticEnergy);
 
         // Center of mass speed of the product of interest as a fraction of c
-        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/productOfInterest.getMass()/Constants.MEV_PER_AMU);
+        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/C.getMass()/Constants.MEV_PER_AMU);
 
 
         /**
@@ -79,16 +101,21 @@ public class NuclearReaction {
         productSpeed_Lab += centerOfMassVelocity.getNorm()*FastMath.cos(angle);             // vCM * cos(\theta) + \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
 
         // Convert this to an energy in MeV
-        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*C.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
 
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
-        Particle productParticle = new Particle(productOfInterest, A.getPosition(), direction, productEnergy_Lab, A.getTime());
+        Particle productParticle = new Particle(C, A.getPosition(), direction, productEnergy_Lab, A.getTime());
 
         return productParticle;
     }
 
-    public Particle getProductParticle(Particle A, Particle B){
+    // TODO: This assumes 2 body
+    private Particle getProductParticle(Particle A, Particle B){
+
+        // Rename products for readability
+        ParticleType C = this.products[0];      // The returned product
+        ParticleType D = this.products[1];      // The other product
 
         // Reduced mass of these two particles in amu
         double reducedMass = A.getMass()*B.getMass() / (A.getMass() + B.getMass());
@@ -103,10 +130,10 @@ public class NuclearReaction {
         Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
 
         // Center of mass energy of the product of interest in MeV
-        double productEnergy_CoM = (otherProduct.getMass() / (productOfInterest.getMass() + otherProduct.getMass())) * (energyReleased + kineticEnergy);
+        double productEnergy_CoM = (D.getMass() / (C.getMass() + D.getMass())) * (getQValue() + kineticEnergy);
 
         // Center of mass speed of the product of interest as a fraction of c
-        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/productOfInterest.getMass()/Constants.MEV_PER_AMU);
+        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/C.getMass()/Constants.MEV_PER_AMU);
 
 
         /**
@@ -116,13 +143,47 @@ public class NuclearReaction {
         Vector3D productVelocity_CoM = Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
         Vector3D productVelocity_Lab = centerOfMassVelocity.add(productVelocity_CoM);
         double productSpeed_Lab = productVelocity_Lab.getNorm();
-        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*productOfInterest.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
-        Particle productParticle = new Particle(productOfInterest, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab, A.getTime());
+        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*C.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
+        Particle productParticle = new Particle(C, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab, A.getTime());
 
 
         return productParticle;
     }
 
+
+
+    // Getter functions
+    // ****************
+
+    /**
+     * Calculate and return the Q of this reaction
+     * @return Q of this reaction in MeV
+     */
+    public Double getQValue(){
+
+        // Initialize our Q
+        double Q = 0.0;
+
+        // Add the mass of all the reacting particles
+        for (ParticleType reactant : reactants){
+            Q += reactant.getMass();
+        }
+
+        // Subtract the mass of all of our product particles
+        for (ParticleType product : products){
+            Q -= product.getMass();
+        }
+
+        // Return in MeV
+        return Q * Constants.MEV_PER_AMU;
+    }
+
+    /**
+     * Returns the maximum possible energy product
+     * @param A
+     * @param B
+     * @return
+     */
     public Particle getMaxEnergyProductParticle(Particle A, Particle B){
         Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
         Vector3D direction = centerOfMassVelocity.normalize();
@@ -135,20 +196,50 @@ public class NuclearReaction {
         return getProductParticle(A, B, direction);
     }
 
-    public ParticleType getReactantParticleTypeA() {
-        return reactantParticleTypeA;
+    public double getZeroTemperatureMeanEnergy(){
+        ParticleType C = products[0];
+        ParticleType D = products[1];
+
+        return getQValue() * D.getMass() / (C.getMass() + D.getMass());
     }
 
-    public ParticleType getReactantParticleTypeB() {
-        return reactantParticleTypeB;
+    public ParticleType[] getReactants() {
+        return reactants;
     }
 
-    public ParticleType getProductOfInterest() {
-        return productOfInterest;
+    public ParticleType[] getProducts() {
+        return products;
     }
 
-    public ParticleType getOtherProduct() {
-        return otherProduct;
+    public String toString(){
+        String string = "";
+
+        // Add all of the reactants
+        for (ParticleType reactant : reactants) {
+            string += reactant.toString() + " + ";
+        }
+
+        // Remove the extra " + "
+        string = string.substring(0, string.length() - 3);
+
+        // Add the " -> "
+        string += " -> ";
+
+
+        // Add all of the products
+        for (ParticleType product : products){
+            string += product.toString() + " + ";
+        }
+
+        // Remove the extra " + "
+        string = string.substring(0, string.length() - 3);
+
+        // Add the Q value
+        string += String.format(" (%.2f MeV)", getQValue());
+
+
+        // Return
+        return string;
     }
 
     // Return cross section in units of cm^2
@@ -174,25 +265,51 @@ public class NuclearReaction {
      */
 
     public boolean equals(Object o){
+
+        // Simple sanity checks
         if (o == this) return true;
         if (!(o instanceof NuclearReaction)) return false;
 
+        // Verify that the reactants and products are the same length
         NuclearReaction reaction = (NuclearReaction) o;
-        return reactantParticleTypeA.equals(reaction.getReactantParticleTypeA())
-                && reactantParticleTypeB.equals(reaction.getReactantParticleTypeB())
-                && productOfInterest.equals(reaction.getProductOfInterest())
-                && otherProduct.equals(reaction.getOtherProduct());
+        if (this.reactants.length != reaction.getReactants().length) return false;
+        if (this.products.length  != reaction.getProducts().length)  return false;
+
+        // Compare every reactant
+        // TODO: Consider accounting for the fact that order doesn't matter?
+        ParticleType[] reactants = reaction.getReactants();
+        for (int i = 0; i < reactants.length; i++){
+            if (!this.reactants[i].equals(reactants[i]))    return false;
+        }
+
+        // Compare every product
+        // TODO: Consider accounting for the fact that order doesn't matter?
+        ParticleType[] products = reaction.getProducts();
+        for (int i = 0; i < products.length; i++){
+            if (!this.products[i].equals(products[i]))    return false;
+        }
+
+        // If we're here, this is the same reaction
+        return true;
     }
+
 
     // We'll use ZAID as our unique hash identifier
     public int hashCode(){
-        return reactantParticleTypeA.hashCode() +
-                reactantParticleTypeB.hashCode() +
-                productOfInterest.hashCode() +
-                otherProduct.hashCode();
+        int hashCode = 0;
+
+        for (ParticleType reactant : reactants){
+            hashCode += reactant.hashCode();
+        }
+
+        for (ParticleType product : products){
+            hashCode += product.hashCode();
+        }
+
+        return hashCode;
     }
 
-    private void generateCrossSectionFunction(File dataFile){
+    private PolynomialSplineFunction generateCrossSectionFunction(File dataFile){
 
         ArrayList<Double> E = new ArrayList<>();
         ArrayList<Double> sig = new ArrayList<>();
@@ -211,10 +328,11 @@ public class NuclearReaction {
                 sigArray[i] = sig.get(i);
             }
 
-            crossSection = new SplineInterpolator().interpolate(eArray, sigArray);
+            return new SplineInterpolator().interpolate(eArray, sigArray);
         }
         catch (IOException e){
             e.printStackTrace();
+            return null;
         }
     }
 
@@ -225,14 +343,7 @@ public class NuclearReaction {
         return centerOfMassVelocity;
     }
 
-    public String toString(){
-        return String.format("%s + %s -> %s + %s (%.2f MeV)",
-                reactantParticleTypeA.toString(),
-                reactantParticleTypeB.toString(),
-                productOfInterest.toString(),
-                otherProduct.toString(),
-                energyReleased);
-    }
+
 
 
 }

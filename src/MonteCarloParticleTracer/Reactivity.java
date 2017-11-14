@@ -13,34 +13,28 @@ import java.util.Scanner;
  */
 public class Reactivity {
 
-    final static Reactivity DDn_Reactivity = ddn();
-    final static Reactivity DDp_Reactivity = ddp();
-    final static Reactivity D3Hep_Reactivity = d3Hep();
-    final static Reactivity He3He3_Reactivity = he3he3();
-
-
-
     private PolynomialSplineFunction value;
 
+
+    public final static Reactivity DDn_Reactivity = ddn();
+    public final static Reactivity DDp_Reactivity = ddp();
+    public final static Reactivity D3Hep_Reactivity = d3Hep();
+    public final static Reactivity He3He3_Reactivity = he3he3();
+
+
     private static Reactivity ddn(){
-        return new Reactivity(Utils.DDn_REACTIVITY_FILE);
+        return new Reactivity(DataFiles.DDn_Reactivity_File);
     }
-
     private static Reactivity ddp(){
-        return new Reactivity(Utils.DDp_REACTIVITY_FILE);
+        return new Reactivity(DataFiles.DDp_Reactivity_File);
     }
-
     private static Reactivity d3Hep(){
-        return new Reactivity(Utils.D3Hep_REACTIVITY_FILE);
+        return new Reactivity(DataFiles.D3Hep_Reactivity_File);
     }
-
     private static Reactivity he3he3() {
-        return new Reactivity((Utils.He3He3_REACTIVITY_FILE));
+        return new Reactivity(DataFiles.He3He3_Reactivity_File);
     }
 
-    public Reactivity(String dataFilename){
-        this(new File(dataFilename));
-    }
 
     public Reactivity(File dataFile){
 

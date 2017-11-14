@@ -14,13 +14,7 @@ public class Utils {
     public static final double MINIMUM_LI_PETRASSO_ENERGY_MeV = 0.01;
 
 
-    public static final String D3He_ENDF_XS_FILE = "./data/d3He_BoschHale.dat";
-    public static final String DT_ENDF_XS_FILE   = "./data/dT_BoschHale.dat";
 
-    public static final String DDp_REACTIVITY_FILE = "./data/DDp_Reactivities.dat";
-    public static final String DDn_REACTIVITY_FILE = "./data/DDn_Reactivities.dat";
-    public static final String D3Hep_REACTIVITY_FILE = "./data/D3Hep_Reactivities.dat";
-    public static final String He3He3_REACTIVITY_FILE = "./data/3He3He_Reactivities.dat";
 
 
     public static double[] linspace(double a, double b, int N){
@@ -44,15 +38,15 @@ public class Utils {
         return nodes;
     }
 
-    public static double getNormalizedRadius(Particle particle, PlasmaLayer plasmaLayer){
+    public static double getNormalizedRadius(Particle particle, Plasma plasma){
         double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());
 
         double R     = coordinates[0];
         double theta = coordinates[1];
         double phi   = coordinates[2];
 
-        double rMax = plasmaLayer.getOuterRadiusBound(theta, phi);
-        double rMin = plasmaLayer.getInnerRadiusBound(theta, phi);
+        double rMax = plasma.getOuterRadiusBound(theta, phi);
+        double rMin = plasma.getInnerRadiusBound(theta, phi);
         return (R - rMin) / (rMax - rMin);
     }
 

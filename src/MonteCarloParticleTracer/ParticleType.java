@@ -13,11 +13,14 @@ public class ParticleType {
      */
 
     public static final ParticleType neutron = new ParticleType(Constants.NEUTRON_CHARGE, Constants.NEUTRON_MASS_AMU);
-    public static final ParticleType proton = new ParticleType(Constants.PROTON_CHARGE, Constants.PROTON_MASS_AMU);
-    public static final ParticleType deuteron = new ParticleType(Constants.DEUTERIUM_CHARGE, Constants.DEUTERIUM_MASS_AMU);
-    public static final ParticleType triton = new ParticleType(Constants.TRITIUM_CHARGE, Constants.TRITIUM_MASS_AMU);
-    public static final ParticleType helium3 = new ParticleType(Constants.HELIUM3_CHARGE, Constants.HELIUM3_MASS_AMU);
-    public static final ParticleType alpha = new ParticleType(Constants.ALPHA_CHARGE, Constants.ALPHA_MASS_AMU);
+
+    public static final ParticleType proton = new ParticleType(Constants.HYDROGEN_CHARGE, Constants.PROTON_MASS_AMU);
+    public static final ParticleType deuteron = new ParticleType(Constants.HYDROGEN_CHARGE, Constants.DEUTERIUM_MASS_AMU);
+    public static final ParticleType triton = new ParticleType(Constants.HYDROGEN_CHARGE, Constants.TRITIUM_MASS_AMU);
+
+    public static final ParticleType helium3 = new ParticleType(Constants.HELIUM_CHARGE, Constants.HELIUM3_MASS_AMU);
+    public static final ParticleType alpha = new ParticleType(Constants.HELIUM_CHARGE, Constants.ALPHA_MASS_AMU);
+
     public static final ParticleType carbon = new ParticleType(Constants.CARBON_CHARGE, Constants.CARBON_MASS_AMU);
 
 
@@ -38,6 +41,7 @@ public class ParticleType {
         return mass;
     }
 
+
     public boolean equals(Object o){
         if (o == this) return true;
         if (!(o instanceof ParticleType)) return false;
@@ -48,12 +52,15 @@ public class ParticleType {
 
     // We'll use ZAID as our unique hash identifier
     public int hashCode(){
+        return getZAID();
+    }
+
+    private int getZAID(){
         return 1000*Z + (int) Math.round(mass);
     }
 
     public String toString(){
-        int ZAID = 1000*Z + (int) Math.round(mass);
-        return Integer.toString(ZAID);
+        return String.format("%04d", getZAID());
     }
 
 

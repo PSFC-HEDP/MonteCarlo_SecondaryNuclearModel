@@ -1,6 +1,6 @@
 package MonteCarloParticleTracer;
 
-import org.apache.commons.math3.analysis.function.Constant;
+import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.FastMath;
 
@@ -20,7 +20,10 @@ public class ParticleHistoryTask implements RunnableFuture {
     private final double ENERGY_NODE_WIDTH = 0.01;      // MeV
 
     private ArrayList<Model.LayerData> layerDataList = new ArrayList<>();
-    private ParticleDistribution sourceParticleDistribution;
+
+    private Plasma sourcePlasma;
+    private Distribution radialSourceDistribution;
+    private NuclearReaction sourceReaction;
 
     private Tally[] sourceParticlePositionTallies;
     private Tally[] sourceParticleEnergyTallies;
@@ -48,14 +51,14 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
 
-    public ParticleHistoryTask(ParticleDistribution sourceParticleDistribution, int numParticles) {
-
-        this.sourceParticleDistribution = sourceParticleDistribution;
+    public ParticleHistoryTask(int numParticles) {
         this.numParticles = numParticles;
+    }
 
-        // Create the energy tally for the escaping particles
-        double maxEnergy = 1.05 * sourceParticleDistribution.getMaxEnergy();
-        int numNodes = (int) Math.ceil(maxEnergy / ENERGY_NODE_WIDTH);
+    public void setSourceInformation(Plasma sourcePlasma, Reactivity reactivity, NuclearReaction sourceReaction){
+        this.radialSourceDistribution = sourcePlasma.getSpatialBurnDistribution(reactivity);
+        this.sourcePlasma = sourcePlasma;
+        this.sourceReaction = sourceReaction;
     }
 
     public void addPlasmaLayer(Model.LayerData data){
@@ -83,7 +86,7 @@ public class ParticleHistoryTask implements RunnableFuture {
             int startingLayerIndex = 0;
 
             // Sample a particle
-            Particle particle = sourceParticleDistribution.sample(layerDataList.get(startingLayerIndex).layer);
+            Particle particle = sample();
 
             // Trace this particle through the plasma
             traceThroughPlasma(particle, startingLayerIndex, sourceParticlePositionTallies,
@@ -189,11 +192,11 @@ public class ParticleHistoryTask implements RunnableFuture {
         // Rename for convenience
         Model.LayerData layerData = this.layerDataList.get(layerIndex);
 
-        PlasmaLayer plasmaLayer = layerData.layer;
+        Plasma plasma = layerData.layer;
         StoppingPowerModel stoppingPowerModel = layerData.stoppingPowerModels.get(particle.getType());
 
         // Determine how far this particle needs to travel
-        double distance = getDistanceToPlasmaBoundary(particle, plasmaLayer);
+        double distance = getDistanceToPlasmaBoundary(particle, plasma);
 
         // TODO: Bandage Fix for neutrons having dEdx == 0
         if (particle.getZ() == 0) {
@@ -213,7 +216,7 @@ public class ParticleHistoryTask implements RunnableFuture {
         while (distance > dx && particle.getEnergy() >  0.0) {
 
             // Parameters at the starting point
-            double r1 = Utils.getNormalizedRadius(particle, plasmaLayer);
+            double r1 = Utils.getNormalizedRadius(particle, plasma);
             double E1 = particle.getEnergy();
 
             // Debug message
@@ -238,7 +241,7 @@ public class ParticleHistoryTask implements RunnableFuture {
             dx = Math.min(maxStepSize, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
 
             // Calculate r2 before the energy loop to save time
-            double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasmaLayer);
+            double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
 
 
             // Use trapezoidal method to iterate onto the particle's final energy
@@ -257,7 +260,7 @@ public class ParticleHistoryTask implements RunnableFuture {
                 if (newEnergy < 0.0) {
                     newEnergy = 0.0;
                     dx = -E1 / averageStopping;
-                    r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasmaLayer);
+                    r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
                 }
 
                 energyError = FastMath.abs(newEnergy - E2) / E2;
@@ -273,14 +276,14 @@ public class ParticleHistoryTask implements RunnableFuture {
                 ParticleType reactingPlasmaSpecies = data.backgroundParticle;
 
                 // Grab the average number density of the species we're interacting with between these two positions
-                double n1 = plasmaLayer.getSpeciesNumberDensity(particle.getPosition(), reactingPlasmaSpecies);
-                double n2 = plasmaLayer.getSpeciesNumberDensity(steppedParticle.getPosition(), reactingPlasmaSpecies);
+                double n1 = plasma.getSpeciesNumberDensity(particle.getPosition(), reactingPlasmaSpecies);
+                double n2 = plasma.getSpeciesNumberDensity(steppedParticle.getPosition(), reactingPlasmaSpecies);
                 double n = 0.5 * (n1 + n2);
 
 
                 // Grab the average ion temperature between these two positions
-                double Ti1 = plasmaLayer.getIonTemperature(particle.getPosition());
-                double Ti2 = plasmaLayer.getIonTemperature(steppedParticle.getPosition());
+                double Ti1 = plasma.getIonTemperature(particle.getPosition());
+                double Ti2 = plasma.getIonTemperature(steppedParticle.getPosition());
                 double Ti = 0.5 * (Ti1 + Ti2);
 
 
@@ -342,14 +345,14 @@ public class ParticleHistoryTask implements RunnableFuture {
      * Private convenience methods
      */
 
-    private double getDistanceToPlasmaBoundary(Particle particle, PlasmaLayer plasmaLayer){
+    private double getDistanceToPlasmaBoundary(Particle particle, Plasma plasma){
 
         // Create a clone that we'll use for the calculation
         Particle tempParticle = particle.clone();
 
         // We need some kind of guess of what the step size should be to get started
-        double plasmaRmax = plasmaLayer.getOuterRadiusBound(0.0, 0.0);
-        double plasmaRmin = plasmaLayer.getInnerRadiusBound(0.0, 0.0);
+        double plasmaRmax = plasma.getOuterRadiusBound(0.0, 0.0);
+        double plasmaRmin = plasma.getInnerRadiusBound(0.0, 0.0);
         double dx = (plasmaRmax - plasmaRmin) / MIN_NUM_STEPS;
 
         // Step our particle until we're no longer in the plasma
@@ -357,7 +360,7 @@ public class ParticleHistoryTask implements RunnableFuture {
         do {
             tempParticle = tempParticle.step(dx, 0.0);
             distance += dx;
-        }while (plasmaLayer.getIsInside(tempParticle.getPosition()));
+        }while (plasma.getIsInside(tempParticle.getPosition()));
 
         // Step back into the plasma
         tempParticle = tempParticle.step(-dx, 0.0);
@@ -375,7 +378,7 @@ public class ParticleHistoryTask implements RunnableFuture {
             // To avoid "out of bound" errors, it's very important that we always stay inside the plasma
             // We do this by never updating the error calculation if we're outside the plasma
             // As a result, we'll always underestimate the TRUE distance. Never overestimate
-            if (plasmaLayer.getIsInside(tempParticle.getPosition())){
+            if (plasma.getIsInside(tempParticle.getPosition())){
                 double newDistance = distance + dx;
                 distanceError = FastMath.abs(newDistance - distance)/distance;
                 distance = newDistance;
@@ -407,7 +410,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
         // Build the source energy tallies
-        double maxSourceEnergy = 1.1*sourceParticleDistribution.getMaxEnergy();
+        double maxSourceEnergy = 2.0*sourceReaction.getZeroTemperatureMeanEnergy();     // TODO: HARD CODED!
         int numSourceNodes = (int) Math.ceil(maxSourceEnergy / ENERGY_NODE_WIDTH);
         double[] sourceNodes = Utils.linspace(0.0, maxSourceEnergy, numSourceNodes);
         sourceParticleEnergyTallies   = new Tally[layerDataList.size() + 1];
@@ -416,7 +419,7 @@ public class ParticleHistoryTask implements RunnableFuture {
         }
 
 
-        Particle maxEnergySourceParticle = new Particle(sourceParticleDistribution.getType(), maxSourceEnergy);
+        Particle maxEnergySourceParticle = new Particle(sourceReaction.getProducts()[0], maxSourceEnergy);
 
         // For every layer in this model
         for (Model.LayerData layerData : this.layerDataList){
@@ -464,6 +467,56 @@ public class ParticleHistoryTask implements RunnableFuture {
                 }
             }
         }
+    }
+
+    private Particle sample(){
+
+        // Sample the direction of our position vector
+        // TODO: I don't think this is valid for a non-symmetric plasma...
+        Vector3D position = Utils.sampleRandomNormalizedVector();
+
+        // Convert it to spherical
+        SphericalCoordinates coordinates = new SphericalCoordinates(position);
+
+        // Apache is in Math notation whilst we're in Physics notation
+        double theta = coordinates.getPhi();
+        double phi = coordinates.getTheta();
+
+        // Use our radial distribution and the plasma bounds to determine the magnitude of our position vector
+        double rNorm = radialSourceDistribution.sample();
+        double rMax  = sourcePlasma.getOuterRadiusBound(theta, phi);
+        double rMin  = sourcePlasma.getInnerRadiusBound(theta, phi);
+
+        double r = (rMax - rMin) * rNorm + rMin;
+
+        // Rescale our position vector to this magnitude
+        position = position.scalarMultiply(r);
+
+        // Sample the direction
+        Vector3D direction = Utils.sampleRandomNormalizedVector();
+
+        // Build the energy distribution based on our position in the plasma
+        double mu = sourceReaction.getZeroTemperatureMeanEnergy();      // TODO: Include temperature upshift...
+        double sigma = sourcePlasma.getThermalSigma(position, sourceReaction);
+
+        // TODO: Very temp...
+        double Tion = sourcePlasma.getIonTemperature(position);
+        double deltaE = -9.5302E-04*Math.pow(Tion, 4) +
+                4.2759E-02*Math.pow(Tion, 3) -
+                6.8887E-01*Math.pow(Tion, 2) +
+                8.6333E+00*Math.pow(Tion, 1);
+
+
+        // Sample the energy
+        double energy = Distribution.normDistribution(mu+1e-3*deltaE, sigma).sample();
+
+        // Get the particle type
+        ParticleType type = sourceReaction.getProducts()[0];
+
+        // Return the sample particle
+        Particle particle = new Particle(type, position, direction, energy, 0.0);
+        particle.setWeight(1.0 / numParticles);     // TODO: Use actual XS?
+        return particle;
     }
 
 
