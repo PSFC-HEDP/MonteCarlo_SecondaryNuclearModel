@@ -18,6 +18,7 @@ public class Reactivity {
 
     public final static Reactivity DDn_Reactivity = ddn();
     public final static Reactivity DDp_Reactivity = ddp();
+    public final static Reactivity DTn_Reactivity = dtn();
     public final static Reactivity D3Hep_Reactivity = d3Hep();
     public final static Reactivity He3He3_Reactivity = he3he3();
 
@@ -28,12 +29,14 @@ public class Reactivity {
     private static Reactivity ddp(){
         return new Reactivity(DataFiles.DDp_Reactivity_File);
     }
+    private static Reactivity dtn() { return new Reactivity(DataFiles.DTn_Reactivity_File); }
     private static Reactivity d3Hep(){
         return new Reactivity(DataFiles.D3Hep_Reactivity_File);
     }
     private static Reactivity he3he3() {
         return new Reactivity(DataFiles.He3He3_Reactivity_File);
     }
+
 
 
     public Reactivity(File dataFile){
