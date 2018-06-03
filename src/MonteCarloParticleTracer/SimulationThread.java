@@ -6,104 +6,153 @@ import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Created by lahmann on 2016-09-10.
  */
-public class ParticleHistoryTask implements RunnableFuture {
+public class SimulationThread extends Thread {
 
-    // TODO: Consider making this a user option
-    private final double ENERGY_NODE_WIDTH = 0.01;      // MeV
+    /**
+     * Magic constants
+     */
 
-    private ArrayList<Model.LayerData> layerDataList = new ArrayList<>();
+    // Width between energy nodes used in tallies                       TODO: Make a user input
+    private final double ENERGY_NODE_WIDTH = 0.01;                      // MeV
 
+    // Number of steps each source particle will take through any plasma
+    private final int MIN_NUM_STEPS = 500;
+
+    // Tolerance for calculating the particle energy of the next step
+    private final double ACCEPTABLE_ENERGY_ERROR   = 1e-3;              // Fraction
+
+    // Tolerance for calculating the distance that a particle must travel
+    private final double ACCEPTABLE_DISTANCE_ERROR = 1e-3;              // Fraction
+
+
+
+    /**
+     * Everything else
+     */
+
+    // ORDERED Array list with all of the plasma information
+    private ArrayList<Model.PlasmaData> plasmaData = new ArrayList<>();
+
+    // Plasma from which the source particles originate
     private Plasma sourcePlasma;
+
+    // Radial source distribution
     private Distribution radialSourceDistribution;
+
+    // Nuclear reaction that we sample the source particles from
     private NuclearReaction sourceReaction;
 
+    // Array of tallies for the source particles (1 for birth and 1 for each surface)
     private Tally[] sourceParticlePositionTallies;
     private Tally[] sourceParticleEnergyTallies;
     private Tally[] sourceParticleTimeTallies;
 
+    // Hashmap of tally arrays for every nuclear reaction we're modelling
     private HashMap<NuclearReaction, Tally[]> productParticlePositionTallyMap = new HashMap<>();
     private HashMap<NuclearReaction, Tally[]> productParticleEnergyTallyMap   = new HashMap<>();
     private HashMap<NuclearReaction, Tally[]> productParticleTimeTallyMap     = new HashMap<>();
 
-
+    // Position where the data will be tallied (averages over 4pi if null)
     private Vector3D detectorLineOfSight;
+
+    // Number of particles simulated by this thread
     private int numParticles;
 
-    private boolean debugMode = false;
+    // Logger object for keeping track of this threads process
+    private Logger logger = new Logger(false);
 
-    private Double taskReactionProbability = 0.0;
+
 
     /**
-     * Step parameters
+     * Default constructor
+     * @param numParticles Number of particles simulated by this thread
      */
-    private final int MIN_NUM_STEPS = 500;
-
-    private final double ACCEPTABLE_ENERGY_ERROR   = 1e-3;      // Fraction
-    private final double ACCEPTABLE_DISTANCE_ERROR = 1e-3;      // Fraction
-
-
-
-    public ParticleHistoryTask(int numParticles) {
+    SimulationThread(int numParticles) {
         this.numParticles = numParticles;
     }
 
-    public void setSourceInformation(Plasma sourcePlasma, Reactivity reactivity, NuclearReaction sourceReaction){
+
+    /**
+     * Method for setting the source information
+     * @param sourcePlasma Plasma where the source particles originate
+     * @param reactivity Reactivity of the reaction the generates the source particles
+     * @param sourceReaction Reaction that we use to sample the source particles
+     */
+    void setSourceInformation(Plasma sourcePlasma, Reactivity reactivity, NuclearReaction sourceReaction){
+
+        // Generate the radial distribution using the reactivity
         this.radialSourceDistribution = sourcePlasma.getSpatialBurnDistribution(reactivity);
+
+        // Set the source plasma and reaction
         this.sourcePlasma = sourcePlasma;
         this.sourceReaction = sourceReaction;
+
     }
 
-    public void addPlasmaLayer(Model.LayerData data){
-        this.layerDataList.add(data);
+
+    /**
+     * Method for adding a plasma to the thread. Plasmas must be added in order (inside -> outside)
+     * @param data Data object that stores everything relevant to the simulation
+     */
+    void addPlasma(Model.PlasmaData data){
+        this.plasmaData.add(data);
     }
 
-    public void setDetectorLineOfSight(Vector3D detectorLineOfSight) {
+
+    /**
+     * Method for setting the detector line of sight (not required)
+     * @param detectorLineOfSight Physical location of the tallies (can be null)
+     */
+    void setDetectorLineOfSight(Vector3D detectorLineOfSight) {
         this.detectorLineOfSight = detectorLineOfSight;
     }
 
-    public void setDebugMode(boolean debugMode) {
-        this.debugMode = debugMode;
-    }
 
     @Override
+    /**
+     * Main method of this thread
+     */
     public void run() {
 
+        logger.addLog("Setting up tallies ... ");
         setUpTallies();
+        logger.logTaskCompletion();
 
         for (int i = 0; i < numParticles; i++) {
 
-            //System.out.println(i);
+            logger.addLog("Starting particle num " + i);
 
-            // TODO: We are currently assuming that particles always get born in the center most layer
+            // We're assuming particles are always born in the center plasma TODO: Fix this
             int startingLayerIndex = 0;
 
             // Sample a particle
             Particle particle = sample();
 
-            // Trace this particle through the plasma
-            traceThroughPlasma(particle, startingLayerIndex, sourceParticlePositionTallies,
+            // Simulate this particle
+            traceParticle(particle, startingLayerIndex, sourceParticlePositionTallies,
                     sourceParticleEnergyTallies, sourceParticleTimeTallies);
 
+            logger.logTaskCompletion();
         }
-
-
     }
 
 
     /**
-     * Particle tracing methods
+     * Method that handles tracing and tallying a particle through the entire geometry
+     * Moves the particle between plasmas as surfaces are crossed
+     * @param particle Particle that we want to simulate
+     * @param startingLayerIndex Index of the plasma that this particle started in
+     * @param positionTallies Position tallies corresponding to this particle
+     * @param energyTallies Energy tallies corresponding to this particle
+     * @param timeTallies Time tallies corresponding to this particle
+     * @return This particle after it escapes or dies
      */
-
-    private Particle traceThroughPlasma(Particle particle, int startingLayerIndex, Tally[] positionTallies,
-                                        Tally[] energyTallies, Tally[] timeTallies){
+    private Particle traceParticle(Particle particle, int startingLayerIndex, Tally[] positionTallies,
+                                   Tally[] energyTallies, Tally[] timeTallies){
 
         int currentLayerIndex = startingLayerIndex;
 
@@ -112,96 +161,103 @@ public class ParticleHistoryTask implements RunnableFuture {
         energyTallies  [0].addValue(particle.getEnergy()            , particle.getWeight());
         timeTallies    [0].addValue(particle.getTime()              , particle.getWeight());
 
-        // Grab the current layer data
-        Model.LayerData currentLayerData = layerDataList.get(currentLayerIndex);
+        // Grab the current plasma data
+        Model.PlasmaData currentPlasmaData = plasmaData.get(currentLayerIndex);
 
-        boolean finished = false;
-        while (!finished) {
 
-            // TODO: Bandage Fix for neutrons having dEdx == 0
+        // Loop until the particle dies or escapes
+        while ( true ) {
+
+            // We don't want to bother simulating neutrons for now TODO: Fix this
             if (particle.getZ() == 0) {
                 return particle;
             }
 
-            // Trace the particle through the current layer
-            particle = traceThroughPlasmaLayer(particle, currentLayerIndex);
-            double weight = particle.getWeight();
-            double bias   = weight;
 
-            // TODO: Adhoc weighting
-            if (detectorLineOfSight != null) {
-                bias *= particle.getEnergy();
-            }
+            // Trace the particle through the current plasma
+            particle = traceThroughPlasma(particle, currentLayerIndex);
+
 
             // If the particle is dead, we're done
             if (particle.getEnergy() <= 0) {
-                finished = true;
+                return particle;
             }
 
-            // Else, check to see if we're near the outer boundary
-            else if (currentLayerData.layer.getIsCloserToOuterBoundary(particle.getPosition())) {
+
+            // Figure out the weight and bias of this particle for tallies
+            double weight = particle.getWeight();
+            double bias   = weight;
+
+            if (detectorLineOfSight != null) {
+                bias *= particle.getEnergy();   // TODO: Adhoc correction
+            }
+
+
+            // If we're at the inner boundary, we need to move down to the next inner plasma
+            if (currentPlasmaData.plasma.getIsCloserToInnerBoundary(particle.getPosition())){
+
+                // Tally this particle as crossing the outer surface of the previous plasma (there's a +1 and a -1 that cancel out in the indexing)
+                positionTallies[currentLayerIndex].addBiasedValue(particle.getPosition().getNorm(), bias, weight);
+                energyTallies  [currentLayerIndex].addBiasedValue(particle.getEnergy()            , bias, weight);
+                timeTallies    [currentLayerIndex].addBiasedValue(particle.getTime()              , bias, weight);
+
+                // Decrease the index by 1
+                currentLayerIndex--;
+                currentPlasmaData = plasmaData.get(currentLayerIndex);
+
+                // Move the particle inside the new plasma
+                particle = currentPlasmaData.plasma.moveInside(particle);
+
+            }
+
+            // Otherwise we're at the outer boundary
+            else {
 
                 // Tally this particle as crossing the outer surface (+1 is because we're using the 0th index)
                 positionTallies[currentLayerIndex+1].addBiasedValue(particle.getPosition().getNorm(), bias, weight);
                 energyTallies  [currentLayerIndex+1].addBiasedValue(particle.getEnergy()            , bias, weight);
                 timeTallies    [currentLayerIndex+1].addBiasedValue(particle.getTime()              , bias, weight);
 
-                // If so, and this is the last layer we're done
-                if (currentLayerIndex == layerDataList.size() - 1) {
-                    finished = true;
+
+                // If this is the outer most plasma, we've escaped
+                if (currentLayerIndex == plasmaData.size() - 1) {
+                    return particle;
                 }
 
-                // Otherwise, move on to the next layer
-                else {
-                    currentLayerIndex++;
-                    currentLayerData = layerDataList.get(currentLayerIndex);
 
-                    // Move the particle inside the new layer
-                    particle = currentLayerData.layer.moveInside(particle);
-                }
-            }
+                // If not, we need to move to the next plasma
+                currentLayerIndex++;
+                currentPlasmaData = plasmaData.get(currentLayerIndex);
 
-            // Otherwise, we must be at the inner boundary so we'll move to the previous layer
-            else {
 
-                // Tally this particle as crossing the outer surface of the previous layer (there's a +1 and a -1 that cancel out in the indexing)
-                positionTallies[currentLayerIndex].addBiasedValue(particle.getPosition().getNorm(), bias, weight);
-                energyTallies  [currentLayerIndex].addBiasedValue(particle.getEnergy()            , bias, weight);
-                timeTallies    [currentLayerIndex].addBiasedValue(particle.getTime()              , bias, weight);
+                // Move the particle inside the new plasma
+                particle = currentPlasmaData.plasma.moveInside(particle);
 
-                currentLayerIndex--;
-                currentLayerData = layerDataList.get(currentLayerIndex);
-
-                // Move the particle inside the new layer
-                particle = currentLayerData.layer.moveInside(particle);
             }
         }
-
-        return particle;
     }
 
-    private Particle traceThroughPlasmaLayer(Particle particle, int layerIndex){
 
-        // Debug message
-        if (debugMode){
-            System.out.printf("\nStarting particle with %.4e MeV in layer %d: \n",
-                    particle.getEnergy(), layerIndex);
-            System.out.println(" Step :    x (cm)   |    y (cm)   |    z (cm)   |  r (norm)  |   E (MeV)  ");
-        }
+    /**
+     * Method that traces the particle through a single plasma
+     * @param particle Particle that we want to simulate
+     * @param layerIndex Index of the plasma we're tracing through
+     * @return This particle after it escapes or dies
+     */
+    private Particle traceThroughPlasma(Particle particle, int layerIndex){
 
-        // Rename for convenience
-        Model.LayerData layerData = this.layerDataList.get(layerIndex);
+        // Get the plasma data
+        Model.PlasmaData plasmaData = this.plasmaData.get(layerIndex);
 
-        Plasma plasma = layerData.layer;
-        StoppingPowerModel stoppingPowerModel = layerData.stoppingPowerModels.get(particle.getType());
+
+        // Rename the fields for convenience
+        Plasma plasma = plasmaData.plasma;
+        StoppingPowerModel stoppingPowerModel = plasmaData.stoppingPowerModels.get(particle.getType());
+
 
         // Determine how far this particle needs to travel
-        double distance = getDistanceToPlasmaBoundary(particle, plasma);
+        double distance = getDistanceToPlasmaBoundary(particle, plasma);\
 
-        // TODO: Bandage Fix for neutrons having dEdx == 0
-        if (particle.getZ() == 0) {
-            return particle.step(distance, 0.0);
-        }
 
         // Calculate a step size
         double maxStepSize = distance / MIN_NUM_STEPS;
@@ -218,22 +274,6 @@ public class ParticleHistoryTask implements RunnableFuture {
             // Parameters at the starting point
             double r1 = Utils.getNormalizedRadius(particle, plasma);
             double E1 = particle.getEnergy();
-
-            // Debug message
-            if (debugMode){
-                System.out.printf("Stepping %.4e Velocity = %.4e Time = %.4e dT = %.4e\n", dx,
-                        particle.getVelocity().getNorm()*Constants.SPEED_OF_LIGHT_CM_PER_SEC,
-                        particle.getTime(),
-                        dx / (particle.getVelocity().getNorm()*Constants.SPEED_OF_LIGHT_CM_PER_SEC));
-                /*System.out.printf("%5d : %+.4e | %+.4e | %+.4e | %.4e | %.4e | %.4e\n",
-                        totalSteps,
-                        particle.getPosition().getX(),
-                        particle.getPosition().getY(),
-                        particle.getPosition().getZ(),
-                        r1,
-                        particle.getEnergy(),
-                        particle.getTime());*/
-            }
 
 
             // If the particle is losing a significant amount of energy, we need to take smaller steps
@@ -268,8 +308,8 @@ public class ParticleHistoryTask implements RunnableFuture {
                 dEdx2 = stoppingPowerModel.evaluate(E2, r2);
             }
 
-            // Loop through all of the reactions relevant to this layer
-            ArrayList<Model.ReactionData> reactions = layerData.reactionDataMap.get(particle.getType());
+            // Loop through all of the reactions relevant to this plasma
+            ArrayList<Model.ReactionData> reactions = plasmaData.reactionDataMap.get(particle.getType());
             for (Model.ReactionData data : reactions) {
 
                 NuclearReaction nuclearReaction = data.nuclearReaction;
@@ -318,7 +358,7 @@ public class ParticleHistoryTask implements RunnableFuture {
                 Tally[] timeTallies     = productParticleTimeTallyMap    .get(nuclearReaction);
 
                 // Trace this product through the plasma
-                traceThroughPlasma(productParticle, layerIndex, positionTallies, energyTallies, timeTallies);
+                traceParticle(productParticle, layerIndex, positionTallies, energyTallies, timeTallies);
 
                 // Add the updated tallies to the tally map
                 productParticlePositionTallyMap.put(nuclearReaction, positionTallies);
@@ -395,7 +435,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         // Build the source position tallies
         double[] positionNodes = Utils.linspace(0.0, 75.0*1e-4, 200);      // TODO HARD CODED!
-        sourceParticlePositionTallies = new Tally[layerDataList.size() + 1];
+        sourceParticlePositionTallies = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticlePositionTallies.length; i++){
             sourceParticlePositionTallies[i] = new Tally(positionNodes);
         }
@@ -403,7 +443,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         // Build the source time tallies
         double[] timeNodes = Utils.linspace(0.0, 100.0*1e-12, 200);         // TODO HARD CODED!
-        sourceParticleTimeTallies = new Tally[layerDataList.size() + 1];
+        sourceParticleTimeTallies = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticleTimeTallies.length; i++){
             sourceParticleTimeTallies[i] = new Tally(timeNodes);
         }
@@ -413,7 +453,7 @@ public class ParticleHistoryTask implements RunnableFuture {
         double maxSourceEnergy = 2.0*sourceReaction.getZeroTemperatureMeanEnergy();     // TODO: HARD CODED!
         int numSourceNodes = (int) Math.ceil(maxSourceEnergy / ENERGY_NODE_WIDTH);
         double[] sourceNodes = Utils.linspace(0.0, maxSourceEnergy, numSourceNodes);
-        sourceParticleEnergyTallies   = new Tally[layerDataList.size() + 1];
+        sourceParticleEnergyTallies   = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticlePositionTallies.length; i++){
             sourceParticleEnergyTallies[i] = new Tally(sourceNodes);
         }
@@ -421,8 +461,8 @@ public class ParticleHistoryTask implements RunnableFuture {
 
         Particle maxEnergySourceParticle = new Particle(sourceReaction.getProducts()[0], maxSourceEnergy);
 
-        // For every layer in this model
-        for (Model.LayerData layerData : this.layerDataList){
+        // For every plasma in this model
+        for (Model.PlasmaData layerData : this.plasmaData){
 
             // For each list of reactions
             for (ParticleType key : layerData.reactionDataMap.keySet()){
@@ -435,7 +475,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
                     // Build the product particle position tallies
-                    Tally[] productParticlePositionTallies = new Tally[layerDataList.size() + 1];
+                    Tally[] productParticlePositionTallies = new Tally[plasmaData.size() + 1];
                     for (int i =0; i < productParticlePositionTallies.length; i++){
                         productParticlePositionTallies[i] = new Tally(positionNodes);
                     }
@@ -443,7 +483,7 @@ public class ParticleHistoryTask implements RunnableFuture {
 
 
                     // Build the product particle time tallies
-                    Tally[] productParticleTimeTallies = new Tally[layerDataList.size() + 1];
+                    Tally[] productParticleTimeTallies = new Tally[plasmaData.size() + 1];
                     for (int i =0; i < productParticleTimeTallies.length; i++){
                         productParticleTimeTallies[i] = new Tally(timeNodes);
                     }
@@ -458,7 +498,7 @@ public class ParticleHistoryTask implements RunnableFuture {
                     int numProductNodes = (int) Math.ceil(maxProductEnergy / ENERGY_NODE_WIDTH);
                     double[] productNodes = Utils.linspace(0.0, maxProductEnergy, numProductNodes);
 
-                    Tally[] productParticleEnergyTallies = new Tally[layerDataList.size() + 1];
+                    Tally[] productParticleEnergyTallies = new Tally[plasmaData.size() + 1];
                     for (int i = 0; i < productParticleEnergyTallies.length; i++){
                         productParticleEnergyTallies[i] = new Tally(productNodes);
                     }
@@ -500,15 +540,17 @@ public class ParticleHistoryTask implements RunnableFuture {
         double sigma = sourcePlasma.getThermalSigma(position, sourceReaction);
 
         // TODO: Very temp...
+        /*
         double Tion = sourcePlasma.getIonTemperature(position);
         double deltaE = -9.5302E-04*Math.pow(Tion, 4) +
                 4.2759E-02*Math.pow(Tion, 3) -
                 6.8887E-01*Math.pow(Tion, 2) +
                 8.6333E+00*Math.pow(Tion, 1);
+         */
 
 
         // Sample the energy
-        double energy = Distribution.normDistribution(mu+1e-3*deltaE, sigma).sample();
+        double energy = Distribution.normDistribution(mu, sigma).sample();
 
         // Get the particle type
         ParticleType type = sourceReaction.getProducts()[0];
@@ -549,32 +591,5 @@ public class ParticleHistoryTask implements RunnableFuture {
         return productParticleTimeTallyMap;
     }
 
-    /**
-     * Inherited methods that we don't currently use
-     */
 
-    @Override
-    public Object get() throws InterruptedException, ExecutionException {
-        return null;
-    }
-
-    @Override
-    public boolean cancel(boolean mayInterruptIfRunning) {
-        return false;
-    }
-
-    @Override
-    public boolean isCancelled() {
-        return false;
-    }
-
-    @Override
-    public boolean isDone() {
-        return this.taskReactionProbability == null;
-    }
-
-    @Override
-    public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return null;
-    }
 }

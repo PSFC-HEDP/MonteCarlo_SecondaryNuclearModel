@@ -59,7 +59,7 @@ public class Distribution {
 
 
         // Set the probability functions
-        probability = new LinearInterpolator().interpolate(nodes, normalize(frequencies));
+        probability = new LinearInterpolator().interpolate(nodes, frequencies);
         inverseCumulativeProbability = new LinearInterpolator().interpolate(cumulativeProbabilities, nodes);
     }
 
@@ -97,13 +97,13 @@ public class Distribution {
     }
 
     public String toString(){
-        String string = "   Nodes   |    pdf     |    cdf\n";
+        String string = "Nodes, pdf, cdf\n";
 
         double[] cumulativeProbValues = inverseCumulativeProbability.getKnots();
         for (double cumulativeProbValue : cumulativeProbValues){
             double node = inverseCumulativeProbability.value(cumulativeProbValue);
             double prob = probability.value(node);
-            string += String.format("%.4e | %.4e | %.4e\n", node, prob, cumulativeProbValue);
+            string += String.format("%.8e, %.8e, %.8e\n", node, prob, cumulativeProbValue);
         }
 
         return string;

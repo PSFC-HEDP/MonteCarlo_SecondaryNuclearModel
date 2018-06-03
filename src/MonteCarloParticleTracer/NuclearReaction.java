@@ -237,6 +237,8 @@ public class NuclearReaction {
         // Add the Q value
         string += String.format(" (%.2f MeV)", getQValue());
 
+        // Newline
+        string += "\n";
 
         // Return
         return string;

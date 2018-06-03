@@ -96,7 +96,7 @@ public class Tally {
     }
 
     public String toString(){
-        String string = "   Nodes   |   Weight   |   Uncertainty\n";
+        String string = "Nodes, Weight, Uncertainty\n";
         double normalization = getNormalization();
 
         for (int i = 1; i < binEdges.length; i++){
@@ -108,7 +108,7 @@ public class Tally {
                 uncertainty = weights[i - 1] / Math.sqrt(totalCounts[i - 1]);
             }
 
-            string += String.format("%.4e | %.4e | %.4e\n", binCenter, weight, uncertainty);
+            string += String.format("%.8e, %.8e, %.8e\n", binCenter, weight, uncertainty);
         }
 
         return string;

@@ -2,6 +2,7 @@ package MonteCarloParticleTracer;
 
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+import org.apache.commons.math3.exception.OutOfRangeException;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,6 +69,24 @@ public class Reactivity {
 
 
     double evaluate(double temperature){
-        return value.value(temperature);
+
+        try {
+            return value.value(temperature);
+        }
+
+        catch (OutOfRangeException e) {
+
+            double[] knots = value.getKnots();
+
+            System.err.printf("Warning! Reactivity evaluation at Tion = %.4e keV out of bounds [%.4e %.4e]\n",
+                    temperature, knots[0], knots[knots.length - 1]);
+
+
+            if (temperature < knots[0]) {
+                return value.value(knots[0]);
+            } else {
+                return value.value(knots[knots.length - 1]);
+            }
+        }
     }
 }

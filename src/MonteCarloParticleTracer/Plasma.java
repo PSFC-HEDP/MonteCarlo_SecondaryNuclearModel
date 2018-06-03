@@ -15,7 +15,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 /**
- * This class represents a single layer of plasma defined by radial profiles of mass density, ion temperature, and
+ * This class represents a single plasma of plasma defined by radial profiles of mass density, ion temperature, and
  * electron temperature.
  * The plasma is bounded by two arbitrary boundaries defined by Legendre modes.
  * The plasma profiles are assumed to be separable in r, theta, and phi such that the boundaries and radial profiles
@@ -569,6 +569,10 @@ public class Plasma {
         return distanceToOuter < distanceToInner;
     }
 
+    boolean getIsCloserToInnerBoundary(Vector3D r){
+        return !getIsCloserToOuterBoundary(r);
+    }
+
 
 
     // ****************************************
@@ -778,11 +782,11 @@ public class Plasma {
     // *******************
 
     public String toString(){
-        String string = " r (norm)  | rho (g/cc) |  Ti (keV)  |  Te (keV)\n";
+        String string = "r (norm), rho (g/cc), Ti (keV), Te (keV)\n";
 
         double[] r = getNormalizedRadiusNodes();
         for (int i = 0; i < r.length; i++){
-            string += String.format("%.4e | %.4e | %.4e | %.4e\n", r[i], massDensity.value(r[i]),
+            string += String.format("%.8e, %.8e, %.8e, %.8e\n", r[i], massDensity.value(r[i]),
                     ionTemperature.value(r[i]), electronTemperature.value(r[i]));
         }
 
