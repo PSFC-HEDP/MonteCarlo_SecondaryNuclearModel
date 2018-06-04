@@ -37,9 +37,6 @@ public class Plasma {
     // Constants for handling floating point exceptions
     private static final double OUT_BOUNDS_EPSILON = 1e-6;
 
-    // Constants for predefined profiles
-    private static final int NUM_PROFILE_POINTS = 200;
-
 
     // ArrayList of Legendre Modes that describe the inner boundary of this Plasma
     private ArrayList<LegendreMode> innerBoundaryLegendreModes = new ArrayList<>();
@@ -64,126 +61,48 @@ public class Plasma {
 
 
 
-    // ***********************
-    // Predefined PlasmaLayers
-    // ***********************
-
-    // Profile defined by T(r) = T and \rho(r) = \rho
-    public static Plasma UniformPlasmaOfKnownTotalMass(double P0, double totalMass, double burnT){
-        return UniformPlasmaOfKnownTotalMass(P0, totalMass, burnT, 1.0);
-    }
-
-    public static Plasma UniformPlasmaOfKnownTotalMass(double P0, double totalMass, double burnT, double TeFraction){
-        double[] uniformArray = Utils.linspace(1, 1, NUM_PROFILE_POINTS);
-
-        Plasma plasma = new Plasma(uniformArray, uniformArray, uniformArray);
-        plasma.setOuterP0(P0);
-        plasma.setTotalMass(totalMass);
-        plasma.setDDnBurnAveragedIonTemperature(burnT);
-        plasma.setElectronTemperatureFraction(TeFraction);
-        return plasma;
-    }
-
-    public static Plasma UniformPlasmaOfKnownMassDensity(double P0, double massDensity, double burnT){
-        return UniformPlasmaOfKnownMassDensity(P0, massDensity, burnT, 1.0);
-    }
-
-    public static Plasma UniformPlasmaOfKnownMassDensity(double P0, double massDensity, double burnT, double TeFraction){
-        double[] uniformArray = Utils.linspace(1, 1, NUM_PROFILE_POINTS);
-
-        Plasma plasma = new Plasma(uniformArray, uniformArray, uniformArray);
-        plasma.setOuterP0(P0);
-        plasma.multiplyMassDensityByScalar(massDensity);
-        plasma.setDDnBurnAveragedIonTemperature(burnT);
-        plasma.setElectronTemperatureFraction(TeFraction);
-        return plasma;
-    }
-
-
-    // Profile defined by T(r) = T0 [1 - (r/R)^2]^{0.4} / [1 - 0.15(r/R)^2]
-    // Density profile is simply \rho(r) = \rho0 (T0 / T(r))
-    public static Plasma BettiPlasma(double P0, double totalMass, double burnT){
-        return BettiPlasma(P0, totalMass, burnT, 1.0);
-    }
-
-    public static Plasma BettiPlasma(double P0, double totalMass, double burnT, double TeFraction){
-        final double boundaryEpsilon  =       1e-3;     // Density profiles explode at r = R
-
-        double[] r   = Utils.linspace(0, (1-boundaryEpsilon), NUM_PROFILE_POINTS);  // Normalized r
-        double[] T   = new double[r.length];                                           // Normalized T
-        double[] rho = new double[r.length];                                           // Normalized rho
-
-        for (int i = 0; i < r.length; i++){
-            T[i] = Math.pow(1 - Math.pow(r[i], 2), 0.4);
-            T[i] /= (1 - 0.15*Math.pow(r[i], 2));
-            rho[i] = 1.0 / T[i];
-        }
-
-        Plasma plasma = new Plasma(T, T, rho);
-        plasma.setOuterP0(P0);
-        plasma.setTotalMass(totalMass);
-        plasma.setDDnBurnAveragedIonTemperature(burnT);
-        plasma.setElectronTemperatureFraction(TeFraction);
-        return plasma;
-    }
-
-
-    // Profile defined by T(r) = T0 [1 - (r/R)^2]^{0.331}
-    // Density profile is simply \rho(r) = \rho0 (T0 / T(r))
-    public static Plasma PravPlasma(double P0, double totalMass, double burnT){
-        return PravPlasma(P0, totalMass, burnT, 1.0);
-    }
-
-    public static Plasma PravPlasma(double P0, double totalMass, double burnT, double TeFraction){
-        final double boundaryEpsilon  =       1e-3;     // Density profiles explode at r = R
-
-        double[] r   = Utils.linspace(0, (1-boundaryEpsilon), NUM_PROFILE_POINTS);  // Normalized r
-        double[] T   = new double[r.length];                                           // Normalized T
-        double[] rho = new double[r.length];                                           // Normalized rho
-
-        for (int i = 0; i < r.length; i++){
-            T[i] = Math.pow(1 - Math.pow(r[i], 2), 0.331);
-            rho[i] = 1.0 / T[i];
-        }
-
-        Plasma plasma = new Plasma(T, T, rho);
-        plasma.setOuterP0(P0);
-        plasma.setTotalMass(totalMass);
-        plasma.setDDnBurnAveragedIonTemperature(burnT);
-        plasma.setElectronTemperatureFraction(TeFraction);
-        return plasma;
-    }
-
-
-
-    // ***************************
-    // Generic constructor methods
-    // ***************************
-
+    /**
+     * Default constructor for building a plasma object
+     * At least 1 species needs to be added in addition to this construction
+     * At least 1 outer Legendre mode (usually a P0) needs to be defined in addition to this construction
+     *
+     * @param radiusNodes Nodes (units arbitrary) on which the plasma properties are known (will be normalized internally)
+     * @param ionTemperature Ion temperature (in keV) evaluated at the radius nodes
+     * @param electronTemperature Electron temperature (in keV) evaluated at the radius nodes
+     * @param massDensity Mass density (in g/cc) evaluated at the radius nodes
+     */
     public Plasma(double[] radiusNodes, double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
-        this.ionTemperature = new SplineInterpolator().interpolate(radiusNodes, ionTemperature);
-        this.electronTemperature = new SplineInterpolator().interpolate(radiusNodes, electronTemperature);
-        this.massDensity = new SplineInterpolator().interpolate(radiusNodes, massDensity);
+        DoubleArray normalizedRadii = new DoubleArray(radiusNodes);
+        normalizedRadii.multiply(1.0 / normalizedRadii.getMax());
+
+        this.ionTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), ionTemperature);
+        this.electronTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), electronTemperature);
+        this.massDensity = new SplineInterpolator().interpolate(normalizedRadii.getValues(), massDensity);
     }
 
-    public Plasma(double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
-        double[] r = Utils.linspace(0, 1, ionTemperature.length);
 
-        this.ionTemperature = new SplineInterpolator().interpolate(r, ionTemperature);
-        this.electronTemperature = new SplineInterpolator().interpolate(r, electronTemperature);
-        this.massDensity = new SplineInterpolator().interpolate(r, massDensity);
-    }
-
-    public Plasma(double P0, double[] ionTemperature, double[] electronTemperature, double[] massDensity){
-        this(ionTemperature, electronTemperature, massDensity);
-        setOuterP0(P0);
+    /**
+     * Returns a plasma with a constant Ti = Te = 1 keV and constant rho = 1 g/cc
+     * Use setBurnAveragedIonTemperature to set ion temperature
+     * Use setElectronTemperatureFraction to set electron temperature
+     * Use setAverageMassDensity if mass density is known
+     * Use setTotalMass if total mass is known
+     *
+     * @param numberOfNodes nodes for the profiles
+     * @return a uniform plasma
+     */
+    public static Plasma uniformPlasma(int numberOfNodes){
+        double[] r = DoubleArray.linspace(0, 1, numberOfNodes).getValues();
+        double[] ones = DoubleArray.linspace(1, 1, numberOfNodes).getValues();
+        return new Plasma(r, ones, ones, ones);
     }
 
 
 
     // ***************************************************
-    // Methods used to aid in constructing the Plasma
+    // Add methods used to aid in constructing the Plasma
     // ***************************************************
+
 
     public void addInnerLegendreMode(int l, int m, double magnitude){
         innerBoundaryLegendreModes.add(new LegendreMode(l, m, magnitude));
@@ -206,20 +125,6 @@ public class Plasma {
             species.numberFraction = species.numberProportion / totalProportion;
         }
     }
-
-    public void addDeuteriumSpecies(double numberFraction){
-        this.addSpecies(ParticleType.deuteron, numberFraction);
-    }
-
-    public void addHelium3Species(double numberFraction){
-        this.addSpecies(ParticleType.helium3, numberFraction);
-    }
-
-    public void addTritiumSpecies(double numberFraction){
-        this.addSpecies(ParticleType.triton, numberFraction);
-    }
-
-
 
     // **************
     // Getter methods
@@ -447,6 +352,7 @@ public class Plasma {
         double speciesFraction = 0.0;       // Number fraction of the specific species
 
         for (PlasmaSpecies species : plasmaSpecies){
+            totalFraction += species.getNumberFraction();
             if (species.getType().equals(type)){
                 speciesFraction = species.getNumberFraction();
             }
@@ -455,22 +361,7 @@ public class Plasma {
         return getIonNumberDensity(r) * speciesFraction / totalFraction;
     }
 
-    public boolean containsSpecies(ParticleType type){
-
-        for (PlasmaSpecies species : plasmaSpecies){
-            if (species.getType().equals(type))  return true;
-        }
-
-        return false;
-    }
-
-
-
-    // ****************************************************************************
-    // Getter methods for evaluating the thermal broadening at some position vector
-    // ****************************************************************************
-
-    double getThermalSigma(Vector3D r, NuclearReaction reaction){
+    double getThermalSigma(Vector3D position, NuclearReaction reaction){
         // TODO: Assuming 2 body
         ParticleType[] reactants = reaction.getReactants();
         ParticleType A = reactants[0];
@@ -489,11 +380,21 @@ public class Plasma {
         double Q = reaction.getQValue();
 
         // Get the ion temperature
-        double Tion_MeV = 1e-3 * getIonTemperature(r);
+        double Tion_MeV = 1e-3 * getIonTemperature(position);
 
         // Return the sigma in MeV
         return Math.sqrt(factor * Q * Tion_MeV);
     }
+
+    boolean containsSpecies(ParticleType type){
+
+        for (PlasmaSpecies species : plasmaSpecies){
+            if (species.getType().equals(type))  return true;
+        }
+
+        return false;
+    }
+
 
 
     // ********************************************************************
@@ -524,13 +425,13 @@ public class Plasma {
     // Methods used for handling particles near the plasma's boundary
     // **************************************************************
 
-    boolean getIsInside(Vector3D r){
-        double[] coordinates = Utils.getSphericalFromVector(r);
+    boolean getIsInside(Vector3D position){
+        double[] coordinates = Utils.getSphericalFromVector(position);
         double theta = coordinates[1];
         double phi   = coordinates[2];
 
-        if (r.getNorm() > getInnerRadiusBound(theta, phi)){
-            if (r.getNorm() < getOuterRadiusBound(theta, phi)){
+        if (position.getNorm() > getInnerRadiusBound(theta, phi)){
+            if (position.getNorm() < getOuterRadiusBound(theta, phi)){
                 return true;
             }
         }
@@ -587,12 +488,16 @@ public class Plasma {
         return volumeIntegral("getMassDensity");
     }
 
-    double getVolumeAverageIonTemperature(){
+    double getVolumeAveragedIonTemperature(){
         return volumeIntegral("getIonTemperature") / getTotalVolume();
     }
 
-    double getVolumeAverageElectronTemperature(){
+    double getVolumeAveragedElectronTemperature(){
         return volumeIntegral("getElectronTemperature") / getTotalVolume();
+    }
+
+    double getVolumeAveragedMassDensity(){
+        return volumeIntegral("getMassDensity") / getTotalVolume();
     }
 
 
@@ -647,6 +552,7 @@ public class Plasma {
 
     public double get3He3HepBurnAveragedIonTemperature(){ return getBurnAveragedIonTemperature("get3He3HepReactivity"); }
 
+
     private double getBurnAveragedElectronTemperature(String reactivityMethodName){
         double numerator   = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName, "getElectronTemperature");
         double denominator = volumeIntegral("getMassDensity", "getMassDensity", reactivityMethodName);
@@ -668,7 +574,6 @@ public class Plasma {
     public double get3He3HepBurnAveragedElectronTemperature(){
         return getBurnAveragedElectronTemperature("get3He3HepReactivity");
     }
-
 
 
     // ********************************
@@ -736,15 +641,20 @@ public class Plasma {
         addOuterLegendreMode(0, 0, unnormalizedP0);
     }
 
+    public void setElectronTemperatureFraction(double electronTemperatureFraction){
+        double currentFraction = getVolumeAveragedElectronTemperature() / getVolumeAveragedIonTemperature();
+        double multiplicativeFactor = electronTemperatureFraction / currentFraction;
+        multiplyElectronTemperatureByScalar(multiplicativeFactor);
+    }
+
     public void setTotalMass(double totalMass) {
         double multiplicativeFactor = totalMass / getTotalMass();
         multiplyMassDensityByScalar(multiplicativeFactor);
     }
 
-    public void setElectronTemperatureFraction(double electronTemperatureFraction){
-        double multiplicativeFactor = electronTemperatureFraction
-                * getVolumeAverageIonTemperature() / getVolumeAverageElectronTemperature();
-        multiplyElectronTemperatureByScalar(multiplicativeFactor);
+    public void setAverageMassDensity(double massDensity){
+        double multiplicativeFactor = massDensity / getVolumeAveragedMassDensity();
+        multiplyMassDensityByScalar(multiplicativeFactor);
     }
 
 

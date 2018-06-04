@@ -2,23 +2,20 @@ import MonteCarloParticleTracer.*;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 
 public class YieldRatioGenerator {
 
     private static final int NUM_SPATIAL_NODES  = (int) 201;
     private static final int NUM_PARTICLES      = (int) 1e4;
-    private static final int NUM_CPUS           = (int) 47;
+    private static final int NUM_CPUS           = (int) 11;
 
     public static void main(String ... args) throws Exception{
 
-        File cStopPowFile = new File("src/cStopPow/libcStopPow.so");        // Linux
-        System.load(cStopPowFile.getAbsolutePath());
-
-
-        runModel(Capsule.N180523_001);
-
-
+        for (int i = 0; i < 10; i++) {
+            runModel(Capsule.N180523_001);
+        }
 
     }
 
@@ -42,6 +39,24 @@ public class YieldRatioGenerator {
 
         // Run the simulation
         model.runSimulation(NUM_PARTICLES, NUM_CPUS);
+
+
+        // Get the output file
+        File output = model.getOutputFile();
+
+
+        // Really shitty parser
+        Scanner s = new Scanner(output);
+        while (s.hasNext()){
+            String line = s.nextLine();
+
+            if (line.contains("total")){
+                String[] temp = line.split(",");
+                System.out.print(temp[1] + " ");
+            }
+        }
+        System.out.println();
+        s.close();
 
     }
 
@@ -127,9 +142,9 @@ public class YieldRatioGenerator {
             this.shotNumber         = shotNumber;
             this.burnTemperature    = burnTemperature;
 
-            this.innerRadius        = innerRadius * 1e-4;   // um -> cm
-            this.outerRadius        = outerRadius * 1e-4;   // um -> cm
-            this.fillDensity        = fillDensity * 1e-3;   // um -> cm
+            this.innerRadius        = innerRadius * 1e-4;   // um    -> cm
+            this.outerRadius        = outerRadius * 1e-4;   // um    -> cm
+            this.fillDensity        = fillDensity * 1e-3;   // mg/cc -> g/cc
 
             this.fillSpecies = fillSpecies;
             this.numberProportion = numberProportion;
@@ -139,12 +154,12 @@ public class YieldRatioGenerator {
         public Plasma getFuelPlasma(double convergence, double gamma){
 
             // Make the normalized radius nodes
-            double[] rNorm = Utils.linspace(0, 1, NUM_SPATIAL_NODES);
+            double[] rNorm = DoubleArray.linspace(0, 1, NUM_SPATIAL_NODES).getValues();
 
 
             // We'll assume the density is constant
             double compressedDensity = fillDensity * Math.pow(convergence, 3);
-            double[] rho = Utils.linspace(compressedDensity, compressedDensity, NUM_SPATIAL_NODES);
+            double[] rho = DoubleArray.linspace(compressedDensity, compressedDensity, NUM_SPATIAL_NODES).getValues();
 
 
             // We'll assume a (1 - (r/R)^2)^(gamma) profile
@@ -162,7 +177,8 @@ public class YieldRatioGenerator {
 
 
             // Make the plasma
-            fuelPlasma = new Plasma(P0, T, T, rho);
+            fuelPlasma = new Plasma(rNorm, T, T, rho);
+            fuelPlasma.setOuterP0(P0);
 
 
             // Add all of the species
@@ -173,6 +189,7 @@ public class YieldRatioGenerator {
 
             // Set the plasma to have the burn temperature
             fuelPlasma.setDDnBurnAveragedIonTemperature(burnTemperature);
+            fuelPlasma.setElectronTemperatureFraction(1.0);
 
 
             // Return

@@ -22,5 +22,11 @@ public class Exceptions {
         }
     }
 
+    static class UnsupportedOperatingSystemException extends Exception {
+        UnsupportedOperatingSystemException(String osName){
+            super("No cStopPow libraries compiled for " + osName);
+        }
+    }
+
 
 }

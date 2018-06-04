@@ -8,9 +8,11 @@ import org.apache.commons.math3.analysis.interpolation.BicubicInterpolator;
  */
 public class StoppingPowerModel {
 
-    final double MAXIMUM_STOPPING_POWER_ENERGY = 20.0;
-    final double MINIMUM_STOPPING_POWER_ENERGY = Utils.MINIMUM_LI_PETRASSO_ENERGY_MeV;       // MeV
-    final int NUM_ENERGY_NODES = 200;
+    private static final double MINIMUM_LI_PETRASSO_ENERGY_MeV = 0.01;
+
+    private final double MAX_ENERGY = 20.0;
+    private final double MIN_ENERGY = MINIMUM_LI_PETRASSO_ENERGY_MeV;       // MeV  TODO: Handle this better
+    private final int NUM_NODES = 200;
 
     private BicubicInterpolatingFunction function;     // Stopping power profile defined in f(E,r) space (MeV / cm)
     private double[] radiusNodes;
@@ -19,12 +21,12 @@ public class StoppingPowerModel {
 
     public StoppingPowerModel(ParticleType particleType, Plasma plasma){
 
-        energyNodes = new double[NUM_ENERGY_NODES+1];
+        energyNodes = new double[NUM_NODES +1];
         radiusNodes = plasma.getNormalizedRadiusNodes();
 
 
         energyNodes[0] = 0.0;
-        double[] temp = Utils.linspace(MINIMUM_STOPPING_POWER_ENERGY, MAXIMUM_STOPPING_POWER_ENERGY, NUM_ENERGY_NODES);
+        double[] temp = DoubleArray.linspace(MIN_ENERGY, MAX_ENERGY, NUM_NODES).getValues();
         for (int i = 1; i < energyNodes.length; i++){
             energyNodes[i] = temp[i-1];
         }

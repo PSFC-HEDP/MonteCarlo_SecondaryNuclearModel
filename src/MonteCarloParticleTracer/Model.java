@@ -32,16 +32,16 @@ public class Model {
     // An array list of all nuclear reactions we'll simulate in this model
     private ArrayList<NuclearReaction> nuclearReactions = new ArrayList<>();
 
-    // The line of sight where tallies will be done (can be null) TODO: Consider an array list for multiple tallys
+    // The line of sight where tallies will be done (can be null) TODO: Consider an array list for multiple tallies
     private Vector3D detectorLineOfSight;
 
     // Threads that this model interacts with
     private SimulationThread[] threads;
 
     // Logger object that will keep track of progress / errors
-    private Logger logger = new Logger(true);
+    private Logger logger = new Logger(false);
 
-    // Array of tallies for the source particles (1 tally for birth, and 1 for every surface)
+    // DoubleArray of tallies for the source particles (1 tally for birth, and 1 for every surface)
     private Tally[] sourceParticlePositionTallies = null;
     private Tally[] sourceParticleEnergyTallies = null;
     private Tally[] sourceParticleTimeTallies = null;
@@ -150,6 +150,19 @@ public class Model {
                 throw new Exceptions.InvalidNumberProcessorsRequestedException(numCPUs, Runtime.getRuntime().availableProcessors() - 1);
 
 
+            // Load the stopping power libraries
+            String osName = System.getProperty("os.name");
+            if (osName.contains("Windows")) {
+                System.load(DataFiles.windows_StopPow_Lib.getAbsolutePath());
+            }
+            else if (osName.contains("Linux")) {
+                System.load(DataFiles.linux_StopPow_Lib.getAbsolutePath());
+            }
+            else {
+                throw new Exceptions.UnsupportedOperatingSystemException(osName);
+            }
+
+
             // Calculate the number of particles we'll simulate in each thread
             int particlesPerThread = Math.floorDiv(totalParticles, numCPUs) + 1;
 
@@ -174,7 +187,7 @@ public class Model {
             for (int i = 0; i < threads.length; i++) {
 
                 // Make the thread
-                threads[i] = new SimulationThread(particlesPerThread);
+                threads[i] = new SimulationThread(particlesPerThread, numCPUs*particlesPerThread);
                 logger.addLog("Started thread " + threads[i].getId());
 
                 // Add the source and tally info
@@ -198,8 +211,6 @@ public class Model {
              */
 
             // Rejoin with the threads and sum the tallies
-
-
             logger.addLog("Waiting on threads .... ");
             for (SimulationThread thread : threads) {
 
@@ -276,199 +287,8 @@ public class Model {
 
         finally {
 
-
         }
 
-
-        /*
-        // Start the output file
-        FileWriter w = new FileWriter(outputFile);
-
-        // Write the plasma information
-        for (int i = 0; i < plasmas.size(); i++){
-            w.write("Plasma Layer " + i + "\n");
-            w.write(plasmas.get(i).toString() + "\n");
-        }
-
-        // Write the source distribution to the output file
-        w.write("Source Particle Nuclear Reaction" + "\n");
-        w.write(sourceNuclearReaction.toString() + "\n");
-
-        // Write all of the modeled nuclear reactions to the output file
-        for (int i = 0; i < nuclearReactions.size(); i++){
-            w.write("Modelled Nuclear Reaction " + i + "\n");
-            w.write(nuclearReactions.get(i).toString() + "\n");
-        }
-
-        w.write("Job started at " + System.currentTimeMillis() + "\n");
-
-
-        // Set up the threads and tasks
-        Thread[] threads = new Thread[numCPUs];
-        SimulationThread[] tasks = new SimulationThread[numCPUs];
-        for (int i = 0; i < numCPUs; i++){
-
-            // Sanity check to make sure we don't simulate too many and mess up our normalization
-            int particlesForTask = Math.min(totalPerThread, totalParticles);
-            totalParticles -= particlesForTask;
-
-
-            // Create the task
-            tasks[i] = new SimulationThread(particlesForTask);
-            tasks[i].setSourceInformation(plasmas.get(0), sourceReactivity, sourceNuclearReaction);     // TODO: Assumes the source plasma
-            tasks[i].setDetectorLineOfSight(detectorLineOfSight);
-
-
-            // Sort out all of the data Objects on initiation so we don't have to do it during runtime
-            for (Plasma layer : plasmas){
-                PlasmaData data = buildLayerData(layer);
-                tasks[i].addPlasma(data);
-            }
-
-
-            // Easier for debugging if we run the task in this thread
-            //tasks[i].setDebugMode(true);
-            //tasks[i].run();
-
-
-            // Make a note in the output file
-            w.write(String.format("%d: Starting task %d with %d particles...\n",
-                    System.currentTimeMillis(), i, particlesForTask));
-
-
-            // Start the task
-            threads[i] = new Thread(tasks[i]);
-            threads[i].start();
-        }
-
-
-        Tally[] sourceParticlePositionTallies = null;
-        Tally[] sourceParticleEnergyTallies   = null;
-        Tally[] sourceParticleTimeTallies     = null;
-
-        HashMap<NuclearReaction, Tally[]> productParticlePositionTallyMap = null;
-        HashMap<NuclearReaction, Tally[]> productParticleEnergyTallyMap   = null;
-        HashMap<NuclearReaction, Tally[]> productParticleTimeTallyMap     = null;
-
-        for (int i = 0; i < numCPUs; i ++){
-            try {
-                // Join with the thread
-                threads[i].join();
-
-                // Grab the source particle tallies
-                Tally[] taskSourceParticlePositionTallies = tasks[i].getSourceParticlePositionTallies();
-                Tally[] taskSourceParticleEnergyTallies   = tasks[i].getSourceParticleEnergyTallies();
-                Tally[] taskSourceParticleTimeTallies     = tasks[i].getSourceParticleTimeTallies();
-
-                // Grab the product particle tally maps
-                HashMap<NuclearReaction, Tally[]> taskProductParticlePositionTallyMap = tasks[i].getProductParticlePositionTallyMap();
-                HashMap<NuclearReaction, Tally[]> taskProductParticleEnergyTallyMap   = tasks[i].getProductParticleEnergyTallyMap();
-                HashMap<NuclearReaction, Tally[]> taskProductParticleTimeTallyMap     = tasks[i].getProductParticleTimeTallyMap();
-
-                // Add the source particle tallies together
-                if (i == 0){
-                    sourceParticlePositionTallies = taskSourceParticlePositionTallies;
-                    sourceParticleEnergyTallies   = taskSourceParticleEnergyTallies;
-                    sourceParticleTimeTallies     = taskSourceParticleTimeTallies;
-                }else{
-                    for (int j = 0; j < sourceParticlePositionTallies.length; j++){
-                        sourceParticlePositionTallies[j].addTally(taskSourceParticlePositionTallies[j]);
-                        sourceParticleEnergyTallies  [j].addTally(taskSourceParticleEnergyTallies  [j]);
-                        sourceParticleTimeTallies    [j].addTally(taskSourceParticleTimeTallies    [j]);
-                    }
-                }
-
-                // Add the product particle tallies together
-                if (i == 0){
-                    productParticlePositionTallyMap = taskProductParticlePositionTallyMap;
-                    productParticleEnergyTallyMap   = taskProductParticleEnergyTallyMap;
-                    productParticleTimeTallyMap     = taskProductParticleTimeTallyMap;
-                }else{
-                    for (NuclearReaction key : taskProductParticlePositionTallyMap.keySet()){
-                        Tally[] taskProductParticlePositionTallies = taskProductParticlePositionTallyMap.get(key);
-                        Tally[] taskProductParticleEnergyTallies   = taskProductParticleEnergyTallyMap  .get(key);
-                        Tally[] taskProductParticleTimeTallies     = taskProductParticleTimeTallyMap    .get(key);
-
-                        Tally[] productParticlePositionTallies = productParticlePositionTallyMap.get(key);
-                        Tally[] productParticleEnergyTallies   = productParticleEnergyTallyMap  .get(key);
-                        Tally[] productParticleTimeTallies     = productParticleTimeTallyMap    .get(key);
-
-                        for (int j = 0; j < productParticlePositionTallies.length; j++){
-                            productParticlePositionTallies[j].addTally(taskProductParticlePositionTallies[j]);
-                            productParticleEnergyTallies  [j].addTally(taskProductParticleEnergyTallies  [j]);
-                            productParticleTimeTallies    [j].addTally(taskProductParticleTimeTallies    [j]);
-                        }
-
-                        productParticlePositionTallyMap.put(key, productParticlePositionTallies);
-                        productParticleEnergyTallyMap  .put(key, productParticleEnergyTallies);
-                        productParticleTimeTallyMap    .put(key, productParticleTimeTallies);
-                    }
-                }
-
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-
-        w.write(System.currentTimeMillis() + ": All tasks completed!\n\n");
-
-        w.write("Source Particle Tallies\n");
-        for (int i = 0; i < sourceParticlePositionTallies.length; i++){
-
-            if (i == 0){
-                w.write("Birth Position Tally\n");
-                w.write(sourceParticlePositionTallies[i] + "\n");
-                w.write("Birth Energy Tally\n");
-                w.write(sourceParticleEnergyTallies[i] + "\n");
-                w.write("Birth Time Tally\n");
-                w.write(sourceParticleTimeTallies[i] + "\n");
-            }else{
-                w.write("Position Tally Crossing Plasma Layer " + (i-1) + "\n");
-                w.write(sourceParticlePositionTallies[i] + "\n");
-                w.write("Energy Tally Crossing Plasma Layer " + (i-1) + "\n");
-                w.write(sourceParticleEnergyTallies[i] + "\n");
-                w.write("Time Tally Crossing Plasma Layer " + (i-1) + "\n");
-                w.write(sourceParticleTimeTallies[i] + "\n");
-
-                //double[] fit = sourceParticleTallies[i].getGaussFit();
-                //System.out.print(fit[1] + " " + fit[2] + " ");
-            }
-        }
-
-        w.write("Product Particle Tallies\n");
-        for (NuclearReaction key : productParticlePositionTallyMap.keySet()) {
-            w.write(key + " Product Particle Tallies\n");
-
-            Tally[] productParticlePositionTallies = productParticlePositionTallyMap.get(key);
-            Tally[] productParticleEnergyTallies   = productParticleEnergyTallyMap  .get(key);
-            Tally[] productParticleTimeTallies     = productParticleTimeTallyMap    .get(key);
-
-            for (int i = 0; i < productParticlePositionTallies.length; i++) {
-
-                // TODO: TEMP LAZY
-                System.out.printf(" %.4e", productParticleEnergyTallies[i].getTotalWeight());
-
-                if (i == 0) {
-                    w.write("Birth Position Tally\n");
-                    w.write(productParticlePositionTallies[i] + "\n");
-                    w.write("Birth Energy Tally\n");
-                    w.write(productParticleEnergyTallies[i] + "\n");
-                    w.write("Birth Time Tally\n");
-                    w.write(productParticleTimeTallies[i] + "\n");
-                } else {
-                    w.write("Position Tally Crossing Plasma Layer " + (i - 1) + "\n");
-                    w.write(productParticlePositionTallies[i] + "\n");
-                    w.write("Energy Tally Crossing Plasma Layer " + (i - 1) + "\n");
-                    w.write(productParticleEnergyTallies[i] + "\n");
-                    w.write("Time Tally Crossing Plasma Layer " + (i - 1) + "\n");
-                    w.write(productParticleTimeTallies[i] + "\n");
-                }
-            }
-        }
-
-        System.out.println();
-        w.close();
-        */
     }
 
     private void writeOutputFile() throws Exception {
@@ -585,6 +405,10 @@ public class Model {
 
     }
 
+    public OutputFile getOutputFile() {
+        return outputFile;
+    }
+
     class PlasmaData {
 
         Plasma plasma;
@@ -625,7 +449,7 @@ public class Model {
                 }
 
                 if (sourceParticle.equals(B) && plasma.containsSpecies(A)){
-                    reactionDataMap.get(sourceParticle).add(new ReactionData(reaction, B));
+                    reactionDataMap.get(sourceParticle).add(new ReactionData(reaction, A));
                 }
             }
         }

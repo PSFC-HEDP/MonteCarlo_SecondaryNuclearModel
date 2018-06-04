@@ -27,7 +27,7 @@ public class Distribution {
         double a = mu - NUM_SIGMAS_OUT*sigma;
         double b = mu + NUM_SIGMAS_OUT*sigma;
 
-        double[] nodes = Utils.linspace(a, b, NUM_NODES_FOR_PRESETS);
+        double[] nodes = DoubleArray.linspace(a, b, NUM_NODES_FOR_PRESETS).getValues();
         double[] probabilities = new double[NUM_NODES_FOR_PRESETS];
 
         for (int i = 0; i < nodes.length; i++){

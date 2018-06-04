@@ -46,7 +46,7 @@ public class SimulationThread extends Thread {
     // Nuclear reaction that we sample the source particles from
     private NuclearReaction sourceReaction;
 
-    // Array of tallies for the source particles (1 for birth and 1 for each surface)
+    // DoubleArray of tallies for the source particles (1 for birth and 1 for each surface)
     private Tally[] sourceParticlePositionTallies;
     private Tally[] sourceParticleEnergyTallies;
     private Tally[] sourceParticleTimeTallies;
@@ -62,17 +62,21 @@ public class SimulationThread extends Thread {
     // Number of particles simulated by this thread
     private int numParticles;
 
+    // Weight that all particles are born with by default
+    private double birthWeight;
+
     // Logger object for keeping track of this threads process
     private Logger logger = new Logger(false);
 
 
-
     /**
      * Default constructor
-     * @param numParticles Number of particles simulated by this thread
+     * @param numThreadParticles number of particles to be simulated by this thread
+     * @param numTotalParticles total number of particles in the entire simulation (for proper weighting)
      */
-    SimulationThread(int numParticles) {
-        this.numParticles = numParticles;
+    SimulationThread(int numThreadParticles, int numTotalParticles) {
+        this.numParticles = numThreadParticles;
+        this.birthWeight  = 1.0 / numTotalParticles;
     }
 
 
@@ -130,7 +134,7 @@ public class SimulationThread extends Thread {
             int startingLayerIndex = 0;
 
             // Sample a particle
-            Particle particle = sample();
+            Particle particle = sample(birthWeight);
 
             // Simulate this particle
             traceParticle(particle, startingLayerIndex, sourceParticlePositionTallies,
@@ -256,7 +260,7 @@ public class SimulationThread extends Thread {
 
 
         // Determine how far this particle needs to travel
-        double distance = getDistanceToPlasmaBoundary(particle, plasma);\
+        double distance = getDistanceToPlasmaBoundary(particle, plasma);
 
 
         // Calculate a step size
@@ -434,7 +438,7 @@ public class SimulationThread extends Thread {
     private void setUpTallies(){
 
         // Build the source position tallies
-        double[] positionNodes = Utils.linspace(0.0, 75.0*1e-4, 200);      // TODO HARD CODED!
+        double[] positionNodes = DoubleArray.linspace(0.0, 75.0*1e-4, 200).getValues();      // TODO HARD CODED!
         sourceParticlePositionTallies = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticlePositionTallies.length; i++){
             sourceParticlePositionTallies[i] = new Tally(positionNodes);
@@ -442,7 +446,7 @@ public class SimulationThread extends Thread {
 
 
         // Build the source time tallies
-        double[] timeNodes = Utils.linspace(0.0, 100.0*1e-12, 200);         // TODO HARD CODED!
+        double[] timeNodes = DoubleArray.linspace(0.0, 100.0*1e-12, 200).getValues();         // TODO HARD CODED!
         sourceParticleTimeTallies = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticleTimeTallies.length; i++){
             sourceParticleTimeTallies[i] = new Tally(timeNodes);
@@ -452,7 +456,7 @@ public class SimulationThread extends Thread {
         // Build the source energy tallies
         double maxSourceEnergy = 2.0*sourceReaction.getZeroTemperatureMeanEnergy();     // TODO: HARD CODED!
         int numSourceNodes = (int) Math.ceil(maxSourceEnergy / ENERGY_NODE_WIDTH);
-        double[] sourceNodes = Utils.linspace(0.0, maxSourceEnergy, numSourceNodes);
+        double[] sourceNodes = DoubleArray.linspace(0.0, maxSourceEnergy, numSourceNodes).getValues();
         sourceParticleEnergyTallies   = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticlePositionTallies.length; i++){
             sourceParticleEnergyTallies[i] = new Tally(sourceNodes);
@@ -496,7 +500,7 @@ public class SimulationThread extends Thread {
 
                     double maxProductEnergy = 1.1*maxEnergyProductParticle.getEnergy();
                     int numProductNodes = (int) Math.ceil(maxProductEnergy / ENERGY_NODE_WIDTH);
-                    double[] productNodes = Utils.linspace(0.0, maxProductEnergy, numProductNodes);
+                    double[] productNodes = DoubleArray.linspace(0.0, maxProductEnergy, numProductNodes).getValues();
 
                     Tally[] productParticleEnergyTallies = new Tally[plasmaData.size() + 1];
                     for (int i = 0; i < productParticleEnergyTallies.length; i++){
@@ -509,18 +513,17 @@ public class SimulationThread extends Thread {
         }
     }
 
-    private Particle sample(){
+    private Particle sample(double birthWeight){
 
         // Sample the direction of our position vector
-        // TODO: I don't think this is valid for a non-symmetric plasma...
-        Vector3D position = Utils.sampleRandomNormalizedVector();
+        Vector3D position = Utils.sampleRandomNormalizedVector();                   // TODO: Assumes uniform plasma
+
 
         // Convert it to spherical
-        SphericalCoordinates coordinates = new SphericalCoordinates(position);
+        double[] coordinates = Utils.getSphericalFromVector(position);
+        double theta = coordinates[1];
+        double phi   = coordinates[2];
 
-        // Apache is in Math notation whilst we're in Physics notation
-        double theta = coordinates.getPhi();
-        double phi = coordinates.getTheta();
 
         // Use our radial distribution and the plasma bounds to determine the magnitude of our position vector
         double rNorm = radialSourceDistribution.sample();
@@ -529,35 +532,31 @@ public class SimulationThread extends Thread {
 
         double r = (rMax - rMin) * rNorm + rMin;
 
+
         // Rescale our position vector to this magnitude
         position = position.scalarMultiply(r);
+
 
         // Sample the direction
         Vector3D direction = Utils.sampleRandomNormalizedVector();
 
-        // Build the energy distribution based on our position in the plasma
-        double mu = sourceReaction.getZeroTemperatureMeanEnergy();      // TODO: Include temperature upshift...
-        double sigma = sourcePlasma.getThermalSigma(position, sourceReaction);
 
-        // TODO: Very temp...
-        /*
-        double Tion = sourcePlasma.getIonTemperature(position);
-        double deltaE = -9.5302E-04*Math.pow(Tion, 4) +
-                4.2759E-02*Math.pow(Tion, 3) -
-                6.8887E-01*Math.pow(Tion, 2) +
-                8.6333E+00*Math.pow(Tion, 1);
-         */
+        // Build the energy distribution based on our position in the plasma
+        double mu = sourceReaction.getZeroTemperatureMeanEnergy();              // TODO: Include temperature up-shift
+        double sigma = sourcePlasma.getThermalSigma(position, sourceReaction);
 
 
         // Sample the energy
         double energy = Distribution.normDistribution(mu, sigma).sample();
 
+
         // Get the particle type
         ParticleType type = sourceReaction.getProducts()[0];
 
+
         // Return the sample particle
         Particle particle = new Particle(type, position, direction, energy, 0.0);
-        particle.setWeight(1.0 / numParticles);     // TODO: Use actual XS?
+        particle.setWeight(birthWeight);                                        // TODO: Use actual XS?
         return particle;
     }
 

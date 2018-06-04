@@ -111,6 +111,7 @@ public class Tally {
             string += String.format("%.8e, %.8e, %.8e\n", binCenter, weight, uncertainty);
         }
 
+        string += String.format("total, %.8e\n", totalWeight);
         return string;
     }
 }

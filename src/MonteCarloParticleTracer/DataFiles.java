@@ -6,6 +6,10 @@ class DataFiles {
 
     // Filenames
     // *********
+
+    private static final String WINDOWS_C_STOP_POW_LIB_FILENAME = "src/cStopPow/cStopPow.DLL";
+    private static final String LINUX_C_STOP_POW_LIB_FILENAME   = "src/cStopPow/libcStopPow.so";
+
     private static final String D3He_XS_FILENAME = "./data/d3He_BoschHale.dat";
     private static final String DT_XS_FILENAME = "./data/dT_BoschHale.dat";
 
@@ -17,8 +21,14 @@ class DataFiles {
 
 
 
+
+
     // Files
     // *****
+
+    static File windows_StopPow_Lib = new File(WINDOWS_C_STOP_POW_LIB_FILENAME);
+    static File linux_StopPow_Lib   = new File(LINUX_C_STOP_POW_LIB_FILENAME);
+
     static File D3He_XS_File =  new File(D3He_XS_FILENAME);
     static File DT_XS_File   = new File(DT_XS_FILENAME);
 
