@@ -9,14 +9,19 @@ public class YieldRatioGenerator {
 
     private static final int NUM_SPATIAL_NODES  = (int) 201;
     private static final int NUM_PARTICLES      = (int) 1e3;
-    private static final int NUM_CPUS           = (int) 1;
+    //private static final int NUM_CPUS           = (int) 1;
+    private static final int NUM_CPUS           = Runtime.getRuntime().availableProcessors() - 1;
 
     public static void main(String ... args) throws Exception{
 
+        /*
         runModel(Capsule.N180523_001, 0);
         runModel(Capsule.N180523_001, 0.331);
         runModel(Capsule.N180523_001, 0.5);
         runModel(Capsule.N180523_001, 1.0);
+        */
+
+        uniformModelBenchmark(10.0, 10.0);
 
 
     }

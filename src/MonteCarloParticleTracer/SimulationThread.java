@@ -148,7 +148,7 @@ public class SimulationThread extends Thread {
             logger.stopTimer("Source Particle Lifespan");
         }
 
-        logger.dumpLogToConsole();
+        //logger.dumpLogToConsole();
     }
 
 
@@ -290,8 +290,6 @@ public class SimulationThread extends Thread {
             double r1 = Utils.getNormalizedRadius(particle, plasma);
             double E1 = particle.getEnergy();
 
-            System.out.println(r1);
-
 
             // If the particle is losing a significant amount of energy, we need to take smaller steps
             logger.startTimer("Determine next position");
@@ -366,7 +364,7 @@ public class SimulationThread extends Thread {
 
                 // Generate the resultant particle
                 logger.startTimer("Generate secondary particle");
-                Particle productParticle = nuclearReaction.getProductParticle(particle, backgroundParticle, detectorLineOfSight, logger);
+                Particle productParticle = nuclearReaction.getProductParticle(particle, backgroundParticle, detectorLineOfSight);
                 productParticle.multiplyWeight(particle.getWeight());       // Normalize it to the weigh of it's parent
                 logger.stopTimer("Generate secondary particle");
 
@@ -430,31 +428,35 @@ public class SimulationThread extends Thread {
 
 
         // Bisection method the refine our distance calculation
-        double distance = 0.0;
+        double distance = 0;
         double distanceError = Double.MAX_VALUE;
-        while (distanceError > ACCEPTABLE_DISTANCE_ERROR){
+        while (distanceError > ACCEPTABLE_DISTANCE_ERROR && (dx/distance) > ACCEPTABLE_DISTANCE_ERROR){
 
+            /*
+             *      To avoid "out of bound" errors, it's very important that we always stay inside the plasma
+             *      We do this by never updating the error calculation if we're outside the plasma
+             *      As a result, we'll always underestimate the TRUE distance. Never overestimate
+             */
 
-            // To avoid "out of bound" errors, it's very important that we always stay inside the plasma
-            // We do this by never updating the error calculation if we're outside the plasma
-            // As a result, we'll always underestimate the TRUE distance. Never overestimate
+            // Try stepping dx
+            tempParticle = tempParticle.step(dx, 0.0);
 
+            // If we're still in the plasma update the distance
             if (plasma.getIsInside(tempParticle.getPosition())){
 
                 double newDistance = distance + dx;
-                distanceError = FastMath.abs(newDistance - distance)/distance;
+                if (distance != 0){
+                    distanceError = FastMath.abs(newDistance - distance)/distance;
+                }
                 distance = newDistance;
 
-                tempParticle = tempParticle.step(dx, 0.0);
             }
+
+            // If we left the plasma, undo the step and reduce the step size
             else {
-
-                distance -= dx;
                 tempParticle = tempParticle.step(-dx, 0.0);
+                dx *= 0.5;
             }
-
-            // Reduce step size
-            dx /= 2;
         }
 
         return distance;

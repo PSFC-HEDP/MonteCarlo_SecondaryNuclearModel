@@ -57,10 +57,10 @@ public class NuclearReaction {
     }
 
     // TODO: This assumes 2 body
-    public Particle getProductParticle(Particle A, Particle B, Vector3D direction, Logger logger){
+    public Particle getProductParticle(Particle A, Particle B, Vector3D direction){
 
         if (direction == null){
-            return getProductParticle(A, B, logger);
+            return getProductParticle(A, B);
         }
 
         // Rename products for readability
@@ -106,75 +106,6 @@ public class NuclearReaction {
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
         Particle productParticle = new Particle(C, A.getPosition(), direction, productEnergy_Lab, A.getTime());
-
-        return productParticle;
-    }
-
-    // TODO: This assumes 2 body
-    private Particle getProductParticle(Particle A, Particle B, Logger logger){
-
-        if (logger == null){
-            return getProductParticle(A, B);
-        }
-
-        // Rename products for readability
-        logger.startTimer("-> Get products");
-        ParticleType C = this.products[0];      // The returned product
-        ParticleType D = this.products[1];      // The other product
-        logger.stopTimer("-> Get products");
-
-        // Reduced mass of these two particles in amu
-        logger.startTimer("-> Get reduced mass");
-        double reducedMass = A.getMass()*B.getMass() / (A.getMass() + B.getMass());
-        logger.stopTimer("-> Get reduced mass");
-
-        // Relative velocity of these two particles as a fraction of c
-        logger.startTimer("-> Get relative velocity");
-        Vector3D relativeVelocity = A.getVelocity().subtract(B.getVelocity());
-        logger.stopTimer("-> Get relative velocity");
-
-        // Center of mass kinetic energy of this system in MeV
-        logger.startTimer("-> Get KE");
-        double kineticEnergy = 0.5*Constants.MEV_PER_AMU*reducedMass*FastMath.pow(relativeVelocity.getNorm(),2);    // MeV
-        logger.stopTimer("-> Get KE");
-
-        // Center of mass velocity of this system in MeV
-        logger.startTimer("-> Get CoM velocity");
-        Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
-        logger.stopTimer("-> Get CoM velocity");
-
-        // Center of mass energy of the product of interest in MeV
-        logger.startTimer("-> Get product CoM speed");
-        double productEnergy_CoM = (D.getMass() / (C.getMass() + D.getMass())) * (getQValue() + kineticEnergy);
-
-        // Center of mass speed of the product of interest as a fraction of c
-        double productSpeed_CoM = FastMath.sqrt(2*productEnergy_CoM/C.getMass()/Constants.MEV_PER_AMU);
-        logger.stopTimer("-> Get product CoM speed");
-
-
-        /**
-         * How we handle it if we didn't force the direction
-         */
-
-        logger.startTimer("-> Get product Lab Energy");
-
-        logger.startTimer("->-> Product v CoM");
-        Vector3D productVelocity_CoM = Utils.sampleRandomNormalizedVector().scalarMultiply(productSpeed_CoM);
-        logger.stopTimer("->-> Product v CoM");
-
-        logger.startTimer("->-> Product v Lab");
-        Vector3D productVelocity_Lab = centerOfMassVelocity.add(productVelocity_CoM);
-        logger.stopTimer("->-> Product v Lab");
-
-        double productSpeed_Lab = productVelocity_Lab.getNorm();
-        double productEnergy_Lab = 0.5*Constants.MEV_PER_AMU*C.getMass()*FastMath.pow(productSpeed_Lab,2);        // MeV
-
-        logger.stopTimer("-> Get product Lab Energy");
-
-        logger.startTimer("-> Make particle object");
-        Particle productParticle = new Particle(C, A.getPosition(), productVelocity_Lab.normalize(), productEnergy_Lab, A.getTime());
-        logger.stopTimer("-> Make particle object");
-
 
         return productParticle;
     }
@@ -257,13 +188,13 @@ public class NuclearReaction {
     public Particle getMaxEnergyProductParticle(Particle A, Particle B){
         Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
         Vector3D direction = centerOfMassVelocity.normalize();
-        return getProductParticle(A, B, direction, null);
+        return getProductParticle(A, B, direction);
     }
 
     public Particle getMinEnergyProductParticle(Particle A, Particle B){
         Vector3D centerOfMassVelocity = getCenterOfMassVelocity(A, B);
         Vector3D direction = centerOfMassVelocity.scalarMultiply(-1.0).normalize();
-        return getProductParticle(A, B, direction, null);
+        return getProductParticle(A, B, direction);
     }
 
     public double getZeroTemperatureMeanEnergy(){
