@@ -200,7 +200,7 @@ public class Model {
                 }
 
                 // Start the thread
-                threads[i].start();
+                //threads[i].start();
             }
             logger.logTaskCompletion();
 

@@ -8,9 +8,9 @@ import java.util.Scanner;
 public class YieldRatioGenerator {
 
     private static final int NUM_SPATIAL_NODES  = (int) 201;
-    private static final int NUM_PARTICLES      = (int) 1e3;
-    //private static final int NUM_CPUS           = (int) 1;
-    private static final int NUM_CPUS           = Runtime.getRuntime().availableProcessors() - 1;
+    private static final int NUM_CPUS           = (int) 40;
+    private static final int NUM_PARTICLES      = (int) (NUM_CPUS * 1e3);
+    //private static final int NUM_CPUS           = Runtime.getRuntime().availableProcessors() - 1;
 
     public static void main(String ... args) throws Exception{
 
@@ -28,13 +28,12 @@ public class YieldRatioGenerator {
 
     public static void uniformModelBenchmark(double T, double rho)  throws Exception{
 
-        double[] rhoRs = DoubleArray.logspace(-4, 1, 50).getValues();       // g/cc
+        double[] rhoRs = DoubleArray.logspace(-4, 1, 2).getValues();       // g/cc
 
         for (double rhoR : rhoRs){
 
             // Make the model name
-            String name = String.format("Uniform_Model_T_%.4e_rho_%.4e_rhoR_%.4e_%d",
-                    T, rho, rhoR, System.currentTimeMillis());
+            String name = String.format("Uniform_Model_%d.output", System.currentTimeMillis());
 
 
             // Build the uniform fuel plasma

@@ -529,6 +529,7 @@ public class SimulationThread extends Thread {
                     int numProductNodes = (int) Math.ceil(maxProductEnergy / ENERGY_NODE_WIDTH);
                     double[] productNodes = DoubleArray.linspace(0.0, maxProductEnergy, numProductNodes).getValues();
 
+                    System.out.println(maxProductEnergy + " " + numProductNodes);
                     Tally[] productParticleEnergyTallies = new Tally[plasmaData.size() + 1];
                     for (int i = 0; i < productParticleEnergyTallies.length; i++){
                         productParticleEnergyTallies[i] = new Tally(productNodes);
