@@ -9,7 +9,7 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
  */
 public class Utils {
 
-
+    private static final NormalDistribution NORMAL_DISTRIBUTION = new NormalDistribution();
 
 
 
@@ -46,7 +46,7 @@ public class Utils {
     }
 
     static Vector3D sampleRandomNormalizedVector(){
-        double[] xR = new NormalDistribution().sample(3);
+        double[] xR = NORMAL_DISTRIBUTION.sample(3);
         return new Vector3D(xR[0], xR[1], xR[2]).normalize();
     }
 
