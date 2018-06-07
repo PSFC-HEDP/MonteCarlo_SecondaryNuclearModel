@@ -29,6 +29,10 @@ public class ParticleType {
         this.mass = mass;
     }
 
+    ParticleType copy(){
+        return new ParticleType(Z, mass);
+    }
+
     public boolean equals(ParticleType type){
         return (Z == type.getZ() && mass == type.getMass());
     }

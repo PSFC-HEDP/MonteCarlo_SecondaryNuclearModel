@@ -97,6 +97,41 @@ public class Plasma {
         return new Plasma(r, ones, ones, ones);
     }
 
+    public Plasma copy(){
+
+        // Recreate the profiles
+        double[] r   = this.getNormalizedRadiusNodes();
+        double[] Ti  = new double[r.length];
+        double[] Te  = new double[r.length];
+        double[] rho = new double[r.length];
+        for (int i = 0; i < r.length; i++){
+            Ti[i]  = ionTemperature.value(r[i]);
+            Te[i]  = electronTemperature.value(r[i]);
+            rho[i] = massDensity.value(r[i]);
+        }
+
+        // Create the plasma object
+        Plasma copy = new Plasma(r, Ti, Te, rho);
+
+        // Inner Legendre Modes
+        for (LegendreMode mode : innerBoundaryLegendreModes){
+            copy.addInnerLegendreMode(mode.getEl(), mode.getM(), mode.getMagnitude());
+        }
+
+        // Outer Legendre Modes
+        for (LegendreMode mode : outerBoundaryLegendreModes){
+            copy.addOuterLegendreMode(mode.getEl(), mode.getM(), mode.getMagnitude());
+        }
+
+        // Plasma Species
+        for (PlasmaSpecies species : plasmaSpecies){
+            copy.addSpecies(new ParticleType(species.getZ(), species.getMass()),
+                    species.getNumberFraction());
+        }
+
+        return copy;
+    }
+
 
 
     // ***************************************************
@@ -804,7 +839,7 @@ public class Plasma {
             return type;
         }
 
-        double getZ(){
+        int getZ(){
             return type.getZ();
         }
 

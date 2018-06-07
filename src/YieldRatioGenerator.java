@@ -8,8 +8,8 @@ import java.util.Scanner;
 public class YieldRatioGenerator {
 
     private static final int NUM_SPATIAL_NODES  = (int) 201;
-    private static final int NUM_CPUS           = (int) 40;
-    private static final int NUM_PARTICLES      = (int) (NUM_CPUS * 1e3);
+    private static final int NUM_CPUS           = (int) 11;
+    private static final int NUM_PARTICLES      = (int) (NUM_CPUS * 1e4);
     //private static final int NUM_CPUS           = Runtime.getRuntime().availableProcessors() - 1;
 
     public static void main(String ... args) throws Exception{

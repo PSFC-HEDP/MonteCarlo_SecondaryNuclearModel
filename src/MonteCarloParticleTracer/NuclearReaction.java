@@ -56,6 +56,34 @@ public class NuclearReaction {
 
     }
 
+    public NuclearReaction copy(){
+
+        // Handle the reactants
+        ParticleType A = new ParticleType(this.reactants[0].getZ(), this.reactants[0].getMass());
+        ParticleType B = new ParticleType(this.reactants[1].getZ(), this.reactants[1].getMass());
+
+        // Handled the products
+        ParticleType C = new ParticleType(this.products[0].getZ(), this.products[0].getMass());
+        ParticleType D = new ParticleType(this.products[1].getZ(), this.products[1].getMass());
+
+        // Create the copy
+        NuclearReaction copy = new NuclearReaction(A, B, C, D);
+
+        // If the cross section exists, add that
+        if (crossSection != null){
+
+            double[] energies = crossSection.getKnots();
+            double[] values   = new double[energies.length];
+            for (int i = 0; i < energies.length; i++){
+                values[i] = crossSection.value(energies[i]);
+            }
+
+            copy.crossSection = new SplineInterpolator().interpolate(energies, values);
+        }
+
+        return copy;
+    }
+
     // TODO: This assumes 2 body
     public Particle getProductParticle(Particle A, Particle B, Vector3D direction){
 

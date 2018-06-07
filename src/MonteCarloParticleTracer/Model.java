@@ -199,8 +199,11 @@ public class Model {
                     threads[i].addPlasma(data);
                 }
 
+                // Set up the tallies internally
+                threads[i].setUpTallies();
+
                 // Start the thread
-                //threads[i].start();
+                threads[i].start();
             }
             logger.logTaskCompletion();
 
@@ -416,7 +419,7 @@ public class Model {
         HashMap<ParticleType, ArrayList<ReactionData>> reactionDataMap = new HashMap<>();
 
 
-        public PlasmaData(Plasma plasma) {
+        PlasmaData(Plasma plasma) {
 
             // Store the plasma
             this.plasma = plasma;
@@ -433,6 +436,9 @@ public class Model {
 
             // Loop through all of the nuclear reactions
             for (NuclearReaction reaction : nuclearReactions){
+
+                // Copy the reaction
+                reaction = reaction.copy();
 
                 // Get the product particle associated with this reaction
                 ParticleType productParticle = reaction.getProducts()[0];
@@ -453,6 +459,11 @@ public class Model {
                 }
             }
         }
+
+
+        PlasmaData copy(){
+            return new PlasmaData(plasma.copy());
+        }
     }
 
     class ReactionData{
@@ -463,6 +474,12 @@ public class Model {
         public ReactionData(NuclearReaction nuclearReaction, ParticleType backgroundParticle) {
             this.nuclearReaction = nuclearReaction;
             this.backgroundParticle = backgroundParticle;
+        }
+
+        public ReactionData copy(){
+            NuclearReaction nuclearReaction = this.nuclearReaction.copy();
+            ParticleType backgroundParticle = this.backgroundParticle.copy();
+            return new ReactionData(nuclearReaction, backgroundParticle);
         }
     }
 

@@ -68,6 +68,8 @@ public class SimulationThread extends Thread {
     // Logger object for keeping track of this threads process
     private Logger logger = new Logger(false);
 
+    private boolean debugMode = false;
+
 
     /**
      * Default constructor
@@ -94,9 +96,9 @@ public class SimulationThread extends Thread {
 
         this.radialSourceDistribution = Distribution.deltaFunction(1e-36);      // TODO this is a temp way to invoke hotspot
 
-        // Set the source plasma and reaction
-        this.sourcePlasma = sourcePlasma;
-        this.sourceReaction = sourceReaction;
+        // Set the source plasma and reaction (make unique copies)
+        this.sourcePlasma   = sourcePlasma.copy();
+        this.sourceReaction = sourceReaction.copy();
 
     }
 
@@ -125,30 +127,26 @@ public class SimulationThread extends Thread {
      */
     public void run() {
 
-        logger.addLog("Setting up tallies ... ");
-        setUpTallies();
-        logger.logTaskCompletion();
-
         for (int i = 0; i < numParticles; i++) {
 
-            logger.startTimer("Source Particle Lifespan");
+            if (debugMode)  logger.startTimer("Source Particle Lifespan");
 
             // We're assuming particles are always born in the center plasma TODO: Fix this
             int startingLayerIndex = 0;
 
             // Sample a particle
-            logger.startTimer("Sample source particle");
+            if (debugMode)  logger.startTimer("Sample source particle");
             Particle particle = sample(birthWeight);
-            logger.stopTimer("Sample source particle");
+            if (debugMode)  logger.stopTimer("Sample source particle");
 
             // Simulate this particle
             traceParticle(particle, startingLayerIndex, sourceParticlePositionTallies,
                     sourceParticleEnergyTallies, sourceParticleTimeTallies);
 
-            logger.stopTimer("Source Particle Lifespan");
+            if (debugMode)  logger.stopTimer("Source Particle Lifespan");
         }
 
-        //logger.dumpLogToConsole();
+        if (debugMode)  logger.dumpLogToConsole();
     }
 
 
@@ -267,9 +265,9 @@ public class SimulationThread extends Thread {
 
 
         // Determine how far this particle needs to travel
-        logger.startTimer("Get Distance to Boundary");
+        if (debugMode)  logger.startTimer("Get Distance to Boundary");
         double distance = getDistanceToPlasmaBoundary(particle, plasma);
-        logger.stopTimer("Get Distance to Boundary");
+        if (debugMode)  logger.stopTimer("Get Distance to Boundary");
 
 
         // Calculate a step size
@@ -284,7 +282,7 @@ public class SimulationThread extends Thread {
         // While the particle is inside this plasma
         while (distance > dx && particle.getEnergy() >  0.0) {
 
-            logger.startTimer("Particle Step");
+            if (debugMode)  logger.startTimer("Particle Step");
 
             // Parameters at the starting point
             double r1 = Utils.getNormalizedRadius(particle, plasma);
@@ -292,17 +290,17 @@ public class SimulationThread extends Thread {
 
 
             // If the particle is losing a significant amount of energy, we need to take smaller steps
-            logger.startTimer("Determine next position");
+            if (debugMode)  logger.startTimer("Determine next position");
             double dEdx1 = stoppingPowerModel.evaluate(E1, r1);
             dx = Math.min(maxStepSize, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
 
             // Calculate r2 before the energy loop to save time
             double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
-            logger.stopTimer("Determine next position");
+            if (debugMode)  logger.stopTimer("Determine next position");
 
 
             // Use trapezoidal method to iterate onto the particle's final energy
-            logger.startTimer("Determine next energy");
+            if (debugMode)  logger.startTimer("Determine next energy");
             double E2 = E1;
             double dEdx2 = dEdx1;
             Particle steppedParticle = particle;
@@ -325,7 +323,7 @@ public class SimulationThread extends Thread {
                 E2 = newEnergy;
                 dEdx2 = stoppingPowerModel.evaluate(E2, r2);
             }
-            logger.stopTimer("Determine next energy");
+            if (debugMode)  logger.stopTimer("Determine next energy");
 
             // Loop through all of the reactions relevant to this plasma
             ArrayList<Model.ReactionData> reactions = plasmaData.reactionDataMap.get(particle.getType());
@@ -335,19 +333,19 @@ public class SimulationThread extends Thread {
                 ParticleType reactingPlasmaSpecies = data.backgroundParticle;
 
                 // Grab the average number density of the species we're interacting with between these two positions
-                logger.startTimer("Get average number density");
+                if (debugMode)  logger.startTimer("Get average number density");
                 double n1 = plasma.getSpeciesNumberDensity(particle.getPosition(), reactingPlasmaSpecies);
                 double n2 = plasma.getSpeciesNumberDensity(steppedParticle.getPosition(), reactingPlasmaSpecies);
                 double n = 0.5 * (n1 + n2);
-                logger.stopTimer("Get average number density");
+                if (debugMode)  logger.stopTimer("Get average number density");
 
 
                 // Grab the average ion temperature between these two positions
-                logger.startTimer("Get average ion temperature");
+                if (debugMode)  logger.startTimer("Get average ion temperature");
                 double Ti1 = plasma.getIonTemperature(particle.getPosition());
                 double Ti2 = plasma.getIonTemperature(steppedParticle.getPosition());
                 double Ti = 0.5 * (Ti1 + Ti2);
-                logger.stopTimer("Get average ion temperature");
+                if (debugMode)  logger.stopTimer("Get average ion temperature");
 
 
                 // Create a background particle whose energy in T_ion
@@ -355,18 +353,18 @@ public class SimulationThread extends Thread {
 
 
                 // Grab the average cross section between these two positions
-                logger.startTimer("Get average cross section");
+                if (debugMode)  logger.startTimer("Get average cross section");
                 double sigma1 = nuclearReaction.getCrossSection(particle, backgroundParticle);
                 double sigma2 = nuclearReaction.getCrossSection(steppedParticle, backgroundParticle);
                 double sigma = 0.5 * (sigma1 + sigma2);
-                logger.stopTimer("Get average cross section");
+                if (debugMode)  logger.stopTimer("Get average cross section");
 
 
                 // Generate the resultant particle
-                logger.startTimer("Generate secondary particle");
+                if (debugMode)  logger.startTimer("Generate secondary particle");
                 Particle productParticle = nuclearReaction.getProductParticle(particle, backgroundParticle, detectorLineOfSight);
                 productParticle.multiplyWeight(particle.getWeight());       // Normalize it to the weigh of it's parent
-                logger.stopTimer("Generate secondary particle");
+                if (debugMode)  logger.stopTimer("Generate secondary particle");
 
 
                 // Calculate the reaction probability at this step
@@ -380,7 +378,7 @@ public class SimulationThread extends Thread {
                 }
 
                 // Grab the tallies for this product
-                logger.startTimer("Tally secondary particle");
+                if (debugMode)  logger.startTimer("Tally secondary particle");
                 Tally[] positionTallies = productParticlePositionTallyMap.get(nuclearReaction);
                 Tally[] energyTallies   = productParticleEnergyTallyMap  .get(nuclearReaction);
                 Tally[] timeTallies     = productParticleTimeTallyMap    .get(nuclearReaction);
@@ -392,7 +390,7 @@ public class SimulationThread extends Thread {
                 productParticlePositionTallyMap.put(nuclearReaction, positionTallies);
                 productParticleEnergyTallyMap  .put(nuclearReaction, energyTallies);
                 productParticleTimeTallyMap    .put(nuclearReaction, timeTallies);
-                logger.stopTimer("Tally secondary particle");
+                if (debugMode)  logger.stopTimer("Tally secondary particle");
 
                 // Update the reaction probability
                 particleReactionProb += stepReactionProbability;
@@ -404,7 +402,7 @@ public class SimulationThread extends Thread {
             totalSteps++;
             distance -= dx;
 
-            logger.stopTimer("Particle Step");
+            if (debugMode)  logger.stopTimer("Particle Step");
         }
 
         return particle;
@@ -462,7 +460,7 @@ public class SimulationThread extends Thread {
         return distance;
     }
 
-    private void setUpTallies(){
+    void setUpTallies(){
 
         // Build the source position tallies
         double[] positionNodes = DoubleArray.linspace(0.0, 75.0*1e-4, 200).getValues();      // TODO HARD CODED!
@@ -529,7 +527,6 @@ public class SimulationThread extends Thread {
                     int numProductNodes = (int) Math.ceil(maxProductEnergy / ENERGY_NODE_WIDTH);
                     double[] productNodes = DoubleArray.linspace(0.0, maxProductEnergy, numProductNodes).getValues();
 
-                    System.out.println(maxProductEnergy + " " + numProductNodes);
                     Tally[] productParticleEnergyTallies = new Tally[plasmaData.size() + 1];
                     for (int i = 0; i < productParticleEnergyTallies.length; i++){
                         productParticleEnergyTallies[i] = new Tally(productNodes);
