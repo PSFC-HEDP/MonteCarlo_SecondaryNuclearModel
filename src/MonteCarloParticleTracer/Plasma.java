@@ -465,10 +465,16 @@ public class Plasma {
         double theta = coordinates[1];
         double phi   = coordinates[2];
 
-        if (position.getNorm() > getInnerRadiusBound(theta, phi)){
-            if (position.getNorm() < getOuterRadiusBound(theta, phi)){
+        if (position.getNorm() < getOuterRadiusBound(theta, phi)){
+
+            // This plasma may not have an inner bound
+            if (innerBoundaryLegendreModes.size() == 0)
                 return true;
-            }
+
+            // Otherwise, verify that we're within the inner bound as well
+            if (position.getNorm() > getInnerRadiusBound(theta, phi))
+                return true;
+
         }
 
         return false;

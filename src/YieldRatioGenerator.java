@@ -8,27 +8,27 @@ import java.util.Scanner;
 public class YieldRatioGenerator {
 
     private static final int NUM_SPATIAL_NODES  = (int) 201;
-    private static final int NUM_CPUS           = (int) 11;
-    private static final int NUM_PARTICLES      = (int) (NUM_CPUS * 1e4);
+    private static final int NUM_CPUS           = (int) 47;
+    private static final int NUM_PARTICLES      = (int) (NUM_CPUS * 1e3);
     //private static final int NUM_CPUS           = Runtime.getRuntime().availableProcessors() - 1;
 
     public static void main(String ... args) throws Exception{
 
-        /*
         runModel(Capsule.N180523_001, 0);
         runModel(Capsule.N180523_001, 0.331);
         runModel(Capsule.N180523_001, 0.5);
+        runModel(Capsule.N180523_001, 0.75);
         runModel(Capsule.N180523_001, 1.0);
-        */
 
-        uniformModelBenchmark(10.0, 10.0);
+
+        //uniformModelBenchmark(10.0, 10.0);
 
 
     }
 
     public static void uniformModelBenchmark(double T, double rho)  throws Exception{
 
-        double[] rhoRs = DoubleArray.logspace(-4, 1, 2).getValues();       // g/cc
+        double[] rhoRs = DoubleArray.logspace(-2, 1, 201).getValues();       // g/cc
 
         for (double rhoR : rhoRs){
 
@@ -126,7 +126,12 @@ public class YieldRatioGenerator {
             s.close();
 
             double ratio = totals.get(7);
-            System.out.printf("%.2f %.4e\n", CR, ratio);
+            System.out.printf("%.2f %.2f %.2f %.4e %.4e\n",
+                    CR,
+                    capsule.getCapsuleConvergence(CR),
+                    10000*capsule.getInnerRadius() / CR,
+                    1000*fuelPlasma.getArealDensity(0.0, 0.0),
+                    ratio);
         }
 
     }
@@ -208,14 +213,14 @@ public class YieldRatioGenerator {
                 }}
         );
 
-        public Capsule(String shotName, String shotNumber, double burnTemperature, double innerRadius, double outerRadius, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
+        public Capsule(String shotName, String shotNumber, double burnTemperature, double outerRadius, double thickness, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
             this.shotName           = shotName;
             this.shotNumber         = shotNumber;
             this.burnTemperature    = burnTemperature;
 
-            this.innerRadius        = innerRadius * 1e-4;   // um    -> cm
-            this.outerRadius        = outerRadius * 1e-4;   // um    -> cm
-            this.fillDensity        = fillDensity * 1e-3;   // mg/cc -> g/cc
+            this.innerRadius        = (outerRadius - thickness) * 1e-4;     // um    -> cm
+            this.outerRadius        = outerRadius * 1e-4;                   // um    -> cm
+            this.fillDensity        = fillDensity * 1e-3;                   // mg/cc -> g/cc
 
             this.fillSpecies = fillSpecies;
             this.numberProportion = numberProportion;
@@ -268,7 +273,7 @@ public class YieldRatioGenerator {
         }
 
         public double getCapsuleConvergence(double convergence){
-            return convergence * (1 + (outerRadius - innerRadius)/ innerRadius);
+            return convergence * (1 + ((outerRadius - innerRadius)/ innerRadius));
         }
 
         public String getShotName() {

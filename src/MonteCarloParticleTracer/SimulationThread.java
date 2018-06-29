@@ -92,9 +92,9 @@ public class SimulationThread extends Thread {
 
         // Generate the radial distribution using the reactivity
 
-        //this.radialSourceDistribution = sourcePlasma.getSpatialBurnDistribution(reactivity);
+        this.radialSourceDistribution = sourcePlasma.getSpatialBurnDistribution(reactivity);
 
-        this.radialSourceDistribution = Distribution.deltaFunction(1e-36);      // TODO this is a temp way to invoke hotspot
+        //this.radialSourceDistribution = Distribution.deltaFunction(1e-36);      // TODO this is a temp way to invoke hotspot
 
         // Set the source plasma and reaction (make unique copies)
         this.sourcePlasma   = sourcePlasma.copy();
@@ -128,6 +128,8 @@ public class SimulationThread extends Thread {
     public void run() {
 
         for (int i = 0; i < numParticles; i++) {
+
+            //System.out.println(i + " - " + Thread.currentThread().getId());
 
             if (debugMode)  logger.startTimer("Source Particle Lifespan");
 
@@ -271,8 +273,7 @@ public class SimulationThread extends Thread {
 
 
         // Calculate a step size
-        double maxStepSize = distance / MIN_NUM_STEPS;
-        double dx = maxStepSize;
+        double dx = distance / MIN_NUM_STEPS;
 
         int totalSteps = 0;                             // This is for debugging only
         double particleReactionProb = 0.0;
@@ -292,7 +293,12 @@ public class SimulationThread extends Thread {
             // If the particle is losing a significant amount of energy, we need to take smaller steps
             if (debugMode)  logger.startTimer("Determine next position");
             double dEdx1 = stoppingPowerModel.evaluate(E1, r1);
-            dx = Math.min(maxStepSize, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
+            dx = Math.min(dx, -initialEnergy / dEdx1 / MIN_NUM_STEPS);
+
+
+            // We need to ensure that the particle doesn't step outside the plasma
+            dx = Math.min(dx, distance);
+
 
             // Calculate r2 before the energy loop to save time
             double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
