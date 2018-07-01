@@ -34,7 +34,7 @@ public class ParticleType {
     }
 
     public boolean equals(ParticleType type){
-        return (Z == type.getZ() && mass == type.getMass());
+        return (getZAID() == type.getZAID());
     }
 
     public int getZ() {
@@ -51,7 +51,7 @@ public class ParticleType {
         if (!(o instanceof ParticleType)) return false;
 
         ParticleType type = (ParticleType) o;
-        return Z == type.getZ() && mass == type.getMass();
+        return (getZAID() == type.getZAID());
     }
 
     // We'll use ZAID as our unique hash identifier

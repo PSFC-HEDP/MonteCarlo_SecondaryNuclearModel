@@ -92,6 +92,7 @@ public class Tally {
     }
 
     public double getNormalization(){
+        if (getTotalOfWeights() == 0) return 1.0;
         return getTotalWeight() / getTotalOfWeights();
     }
 

@@ -47,9 +47,9 @@ public class Model {
     private Tally[] sourceParticleTimeTallies = null;
 
     // HashMap of tally arrays for every nuclear reaction we model
-    private HashMap<NuclearReaction, Tally[]> productParticlePositionTallyMap = null;
-    private HashMap<NuclearReaction, Tally[]> productParticleEnergyTallyMap = null;
-    private HashMap<NuclearReaction, Tally[]> productParticleTimeTallyMap = null;
+    HashMap<NuclearReaction, Tally[]> productParticlePositionTallyMap = null;
+    HashMap<NuclearReaction, Tally[]> productParticleEnergyTallyMap = null;
+    HashMap<NuclearReaction, Tally[]> productParticleTimeTallyMap = null;
 
 
 
@@ -61,18 +61,6 @@ public class Model {
         this.outputFile = new OutputFile(name);
     }
 
-    /**
-     * Preconfigured model to simulate DD-tritions and generate secondary DT neutrons
-     * User still must specify a source plasma with deuterium
-     * @param name Filename for the file where the output data will be saved
-     * @return A Model for secondary DTn simulations
-     */
-    public static Model SecondaryDTnModel(String name){
-        Model model = new Model(name);
-        model.setSourceInformation(NuclearReaction.DD_t, Reactivity.DDp_Reactivity);
-        model.addNuclearReaction(NuclearReaction.DT_n);
-        return model;
-    }
 
 
     /**

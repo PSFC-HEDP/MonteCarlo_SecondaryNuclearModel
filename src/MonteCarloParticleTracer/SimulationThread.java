@@ -400,6 +400,7 @@ public class SimulationThread extends Thread {
 
                 // Update the reaction probability
                 particleReactionProb += stepReactionProbability;
+
             }
 
             // Initialize the next step
