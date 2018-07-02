@@ -20,7 +20,7 @@ public class GUI extends JFrame implements WindowListener {
     // *******************
 
     // Default number of particles to use per simulation
-    private final Double  DEFAULT_NUM_PARTICLES = 1e5;
+    private final Double  DEFAULT_NUM_PARTICLES = 5e4;
 
     // Default number of CPUs to request for each simulation
     private final Integer DEFAULT_NUM_CPUS = Runtime.getRuntime().availableProcessors() - 1;
@@ -140,6 +140,7 @@ public class GUI extends JFrame implements WindowListener {
         super("Secondary DTn Analysis GUI");
         setupActionListeners();
         buildMainWindow();
+        loadData(Temp_Database.data[4]);
     }
 
 
@@ -445,7 +446,7 @@ public class GUI extends JFrame implements WindowListener {
 
         // Set up the window
         this.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        this.setLocation(600, 600);         // TODO
+        this.setLocation(100, 100);         // TODO
         this.addWindowListener(this);
         this.setResizable(false);
 
@@ -458,6 +459,20 @@ public class GUI extends JFrame implements WindowListener {
         // Log completion
         writeToLog("Initialization complete!");
 
+    }
+
+
+    private void loadData(Temp_Database.Data data){
+        primaryYieldValueField.setValue(data.Y1n);
+        primaryYieldUncertaintyField.setValue(data.Y1n_unc);
+        secondaryYieldValueField.setValue(data.Y2n);
+        secondaryYieldUncertaintyField.setValue(data.Y2n_unc);
+        electronTemperatureValueField.setValue(data.Te);
+        electronTemperatureUncertaintyField.setValue(data.Te_unc);
+
+        outerRadiusValueField.setValue(data.Ro);
+        thicknessValueField.setValue(data.t);
+        initialDensityValueField.setValue(data.rho);
     }
 
 
@@ -657,13 +672,17 @@ public class GUI extends JFrame implements WindowListener {
         }
 
         // Calculate the yield ratio
-        double ratio = Y2n / Y1n;
-        double ratio_Unc = ratio * Math.sqrt( Math.pow(Y1n_Unc/Y1n, 2) + Math.pow(Y2n_Unc/Y2n, 2) );
+        final double ratio = Y2n / Y1n;
+        final double ratio_Unc = ratio * Math.sqrt( Math.pow(Y1n_Unc/Y1n, 2) + Math.pow(Y2n_Unc/Y2n, 2) );
+
+
+        // Need to cast the temperature to final variables
+        final double finalTe     = Te;
+        final double finalTe_Unc = Te_Unc;
 
 
         // Build the capsule object
-        Capsule capsule = new Capsule(Te, Ro, t, rho, fuelSpecies, numberProportions);
-
+        Capsule capsule = new Capsule(Ro, t, rho, fuelSpecies, numberProportions);
 
         // Create an analyzer
         Analyzer analyzer = new Analyzer(this, capsule, gamma, numParticles, numCPUs);
@@ -673,7 +692,7 @@ public class GUI extends JFrame implements WindowListener {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                analyzer.doAnalysis(ratio);
+                analyzer.doAnalysis(ratio, ratio_Unc, finalTe, finalTe_Unc);
             }
         });
 
@@ -762,6 +781,7 @@ public class GUI extends JFrame implements WindowListener {
             speciesNameComboBox.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
 
+                    // Fill out fields if we recognize the name
                     for (FuelSpecies species : PREDEFINED_FUEL_SPECIES){
 
                         if (speciesNameComboBox.getSelectedItem().equals(species.name)){

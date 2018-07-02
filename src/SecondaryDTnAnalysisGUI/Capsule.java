@@ -12,7 +12,6 @@ public class Capsule {
 
     private String shotName;
     private String shotNumber;
-    private double burnTemperature;
 
     private double innerRadius;
     private double outerRadius;
@@ -23,10 +22,9 @@ public class Capsule {
 
 
 
-    public Capsule(String shotName, String shotNumber, double burnTemperature, double outerRadius, double thickness, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
+    public Capsule(String shotName, String shotNumber, double outerRadius, double thickness, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
         this.shotName           = shotName;
         this.shotNumber         = shotNumber;
-        this.burnTemperature    = burnTemperature;
 
         this.innerRadius        = (outerRadius - thickness) * 1e-4;     // um    -> cm
         this.outerRadius        = outerRadius * 1e-4;                   // um    -> cm
@@ -36,11 +34,11 @@ public class Capsule {
         this.numberProportion = numberProportion;
     }
 
-    public Capsule(double burnTemperature, double outerRadius, double thickness, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
-        this("", "", burnTemperature, outerRadius, thickness, fillDensity, fillSpecies, numberProportion);
+    public Capsule(double outerRadius, double thickness, double fillDensity, ArrayList<ParticleType> fillSpecies, ArrayList<Double> numberProportion) {
+        this("", "", outerRadius, thickness, fillDensity, fillSpecies, numberProportion);
     }
 
-    public Plasma getFuelPlasma(double convergence, double gamma){
+    public Plasma getFuelPlasma(double burnTemperature, double convergence, double gamma){
 
         // Make the normalized radius nodes
         double[] rNorm = DoubleArray.linspace(0, 1, NUM_SPATIAL_NODES).getValues();

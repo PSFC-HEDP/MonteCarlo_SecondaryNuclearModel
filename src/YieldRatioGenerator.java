@@ -99,7 +99,7 @@ public class YieldRatioGenerator {
 
 
             // Build the fuel plasma
-            Plasma fuelPlasma = capsule.getFuelPlasma(CR, gamma);
+            Plasma fuelPlasma = capsule.getFuelPlasma(3.0, CR, gamma);
 
 
             // Build the model

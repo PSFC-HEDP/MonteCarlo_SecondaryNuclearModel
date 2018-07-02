@@ -252,7 +252,7 @@ public class Plasma {
         return radius;
     }
 
-    double getOuterRadiusBound(double theta, double phi){
+    public double getOuterRadiusBound(double theta, double phi){
         double radius = 0.0;
         for (LegendreMode mode : outerBoundaryLegendreModes){
             radius += mode.evaluate(theta, phi);
