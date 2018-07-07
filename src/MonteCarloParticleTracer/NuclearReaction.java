@@ -124,8 +124,8 @@ public class NuclearReaction {
         // Use the law of cosines (based on vC = vCM + uC) to get the speed of the product as a fraction of c
         double productSpeed_Lab = FastMath.pow(centerOfMassVelocity.getNorm(), 2);       // vCM^2
         productSpeed_Lab *= FastMath.pow(FastMath.cos(angle),2) - 1;                     // vCM^2 * (cos^2(\theta) - 1)
-        productSpeed_Lab += FastMath.pow(productSpeed_CoM,2);                    // uC^2 + vCM^2 * (cos^2(\theta) - 1)
-        productSpeed_Lab = FastMath.sqrt(productSpeed_Lab);                                  // \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
+        productSpeed_Lab += FastMath.pow(productSpeed_CoM,2);                            // uC^2 + vCM^2 * (cos^2(\theta) - 1)
+        productSpeed_Lab = FastMath.sqrt(productSpeed_Lab);                                 // \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
         productSpeed_Lab += centerOfMassVelocity.getNorm()*FastMath.cos(angle);             // vCM * cos(\theta) + \sqrt(uC^2 + vCM^2 * (cos^2(\theta) - 1))
 
         // Convert this to an energy in MeV
@@ -134,6 +134,7 @@ public class NuclearReaction {
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
         Particle productParticle = new Particle(C, A.getPosition(), direction, productEnergy_Lab, A.getTime());
+        productParticle.multiplyWeight(productEnergy_Lab / productEnergy_CoM);
 
         return productParticle;
     }

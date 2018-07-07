@@ -1,6 +1,5 @@
 package MonteCarloParticleTracer;
 
-import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.FastMath;
 
@@ -42,6 +41,9 @@ public class SimulationThread extends Thread {
 
     // Radial source distribution
     private Distribution radialSourceDistribution;
+
+    // Polar source distribution
+    private Distribution polarSourceDistribution;
 
     // Nuclear reaction that we sample the source particles from
     private NuclearReaction sourceReaction;
@@ -90,11 +92,23 @@ public class SimulationThread extends Thread {
      */
     void setSourceInformation(Plasma sourcePlasma, Reactivity reactivity, NuclearReaction sourceReaction){
 
+        // If the plasma bounds vary in phi, we need to proper 2D distribution for the angular dependence
+        if (sourcePlasma.boundsVaryInPhi()){
+            System.err.println("Code does not currently support sampling a 3D plasma");
+            System.exit(-1);
+        }
+
+
+        // If the plasma only varies in theta, we only need a 1D polar distribution
+        else if (sourcePlasma.boundsVaryInTheta()){
+            polarSourceDistribution = sourcePlasma.getPolarDistribution();
+
+        }
+
         // Generate the radial distribution using the reactivity
-
-        this.radialSourceDistribution = sourcePlasma.getSpatialBurnDistribution(reactivity);
-
+        this.radialSourceDistribution = sourcePlasma.getRadialBurnDistribution(reactivity);
         //this.radialSourceDistribution = Distribution.deltaFunction(1e-36);      // TODO this is a temp way to invoke hotspot
+
 
         // Set the source plasma and reaction (make unique copies)
         this.sourcePlasma   = sourcePlasma.copy();
@@ -279,6 +293,8 @@ public class SimulationThread extends Thread {
         double particleReactionProb = 0.0;
         double initialEnergy = particle.getEnergy();
 
+        //System.out.println("START");
+
 
         // While the particle is inside this plasma
         while (distance > dx && particle.getEnergy() >  0.0) {
@@ -303,6 +319,8 @@ public class SimulationThread extends Thread {
             // Calculate r2 before the energy loop to save time
             double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
             if (debugMode)  logger.stopTimer("Determine next position");
+
+            //System.out.println(distance + " " + r2);
 
 
             // Use trapezoidal method to iterate onto the particle's final energy
@@ -376,12 +394,6 @@ public class SimulationThread extends Thread {
                 // Calculate the reaction probability at this step
                 double stepReactionProbability = n * sigma * dx * (1 - particleReactionProb);
                 productParticle.multiplyWeight(stepReactionProbability);
-
-                // TODO: The multiplying by energy is an adhoc way to account for the non-isotropic lab frame distribution
-                // TODO: I don't currently have a justification for why it works beyond the fact that others have done this in the past
-                if (detectorLineOfSight != null) {
-                    //productParticle.multiplyWeight(productParticle.getEnergy());
-                }
 
                 // Grab the tallies for this product
                 if (debugMode)  logger.startTimer("Tally secondary particle");
@@ -547,14 +559,20 @@ public class SimulationThread extends Thread {
 
     private Particle sample(double birthWeight){
 
-        // Sample the direction of our position vector
-        Vector3D position = Utils.sampleRandomNormalizedVector();                   // TODO: Assumes uniform plasma
-
+        // Start by sampling a spherically random normal vector
+        Vector3D position = Utils.sampleRandomNormalizedVector();
 
         // Convert it to spherical
         double[] coordinates = Utils.getSphericalFromVector(position);
         double theta = coordinates[1];
         double phi   = coordinates[2];
+
+
+        // If we have a polar distribution, use it instead
+        if (polarSourceDistribution != null){
+            //theta = polarSourceDistribution.sample();
+            //position = Utils.getVectorFromSpherical(1.0, theta, phi);
+        }
 
 
         // Use our radial distribution and the plasma bounds to determine the magnitude of our position vector

@@ -60,6 +60,11 @@ public class Plasma {
     private PolynomialSplineFunction massDensity;
 
 
+    // Some flags we'll use for special cases that can be used to speed up computational time
+    private boolean boundsVaryInTheta = false;
+    private boolean boundsVaryInPhi   = false;
+
+
 
     /**
      * Default constructor for building a plasma object
@@ -140,11 +145,25 @@ public class Plasma {
 
 
     public void addInnerLegendreMode(int l, int m, double magnitude){
+
+        // Update our flags if needed
+        if (m != 0) boundsVaryInPhi = true;
+        if (l != 0) boundsVaryInTheta = true;
+
+        // Add this mode
         innerBoundaryLegendreModes.add(new LegendreMode(l, m, magnitude));
+
     }
 
     public void addOuterLegendreMode(int l, int m, double magnitude){
+
+        // Update our flags if needed
+        if (m != 0) boundsVaryInPhi = true;
+        if (l != 0) boundsVaryInTheta = true;
+
+        // Add this mode
         outerBoundaryLegendreModes.add(new LegendreMode(l, m, magnitude));
+
     }
 
     public void addSpecies(ParticleType type, double numberProportion){
@@ -238,6 +257,14 @@ public class Plasma {
         return outerBoundaryLegendreModes;
     }
 
+    boolean boundsVaryInTheta(){
+        return boundsVaryInTheta;
+    }
+
+    boolean boundsVaryInPhi(){
+        return boundsVaryInPhi;
+    }
+
 
 
     // ******************************************************
@@ -313,7 +340,7 @@ public class Plasma {
                 return ionTemperature.value(maxValue);
             }
 
-            System.err.printf("Warning! Ion temperature evaluation %.6e cm out of bounds\n", R - maxRadius);
+            System.err.printf("Warning! Ion temperature evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
         }
 
         return Double.NaN;
@@ -342,7 +369,7 @@ public class Plasma {
                 return electronTemperature.value(maxValue);
             }
 
-            System.err.printf("Warning! Electron temperature evaluation %.6e cm out of bounds\n", R - maxRadius);
+            System.err.printf("Warning! Electron temperature evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
         }
 
         return Double.NaN;
@@ -371,7 +398,7 @@ public class Plasma {
                 return massDensity.value(maxValue);
             }
 
-            System.err.printf("Warning! Mass density evaluation %.6e cm out of bounds\n", R - maxRadius);
+            System.err.printf("Warning! Mass density evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
         }
 
         return Double.NaN;
@@ -621,7 +648,7 @@ public class Plasma {
     // Burn distribution getter methods
     // ********************************
 
-    Distribution getSpatialBurnDistribution(Reactivity reactivity){
+    Distribution getRadialBurnDistribution(Reactivity reactivity){
         double[] r = getNormalizedRadiusNodes();                  // Normalized r
         double[] Y = new double[r.length];              // Yield probability
 
@@ -636,21 +663,38 @@ public class Plasma {
         return new Distribution(r, Y);
     }
 
-    Distribution getSpatialDDnBurnDistribution(){
-        return getSpatialBurnDistribution(Reactivity.DDn_Reactivity);
+    Distribution getRadialDDnBurnDistribution(){
+        return getRadialBurnDistribution(Reactivity.DDn_Reactivity);
     }
 
-    Distribution getSpatialDDpBurnDistribution(){
-        return getSpatialBurnDistribution(Reactivity.DDp_Reactivity);
+    Distribution getRadialDDpBurnDistribution(){
+        return getRadialBurnDistribution(Reactivity.DDp_Reactivity);
     }
 
-    Distribution getSpatialD3HepBurnDistribution(){
-        return getSpatialBurnDistribution(Reactivity.D3Hep_Reactivity);
+    Distribution getRadialD3HepBurnDistribution(){
+        return getRadialBurnDistribution(Reactivity.D3Hep_Reactivity);
     }
 
-    Distribution getSpatial3He3HepBurnDistribution(){
-        return getSpatialBurnDistribution(Reactivity.He3He3_Reactivity);
+    Distribution getRadial3He3HepBurnDistribution(){
+        return getRadialBurnDistribution(Reactivity.He3He3_Reactivity);
     }
+
+    Distribution getPolarDistribution(){
+
+        final int NUM_THETA_NODES = 201;
+        double[] theta  = DoubleArray.linspace(0, Math.PI, NUM_THETA_NODES).getValues();
+        double[] length = new double[theta.length];
+
+        for (int i = 0; i < theta.length; i++){
+            double Rmin = getInnerRadiusBound(theta[i], 0.0);
+            double Rmax = getOuterRadiusBound(theta[i], 0.0);
+            length[i] = Rmax - Rmin;
+        }
+
+        return new Distribution(theta, length);
+
+    }
+
 
 
 
@@ -659,11 +703,17 @@ public class Plasma {
     // **************
 
     void setInnerBoundaryLegendreModes(ArrayList<LegendreMode> innerBoundaryLegendreModes) {
-        this.innerBoundaryLegendreModes = innerBoundaryLegendreModes;
+        this.innerBoundaryLegendreModes = new ArrayList<>();
+        for (LegendreMode mode : innerBoundaryLegendreModes){
+            this.addInnerLegendreMode(mode.el, mode.m, mode.magnitude);
+        }
     }
 
     void setOuterBoundaryLegendreModes(ArrayList<LegendreMode> outerBoundaryLegendreModes) {
-        this.outerBoundaryLegendreModes = outerBoundaryLegendreModes;
+        this.outerBoundaryLegendreModes = new ArrayList<>();
+        for (LegendreMode mode : outerBoundaryLegendreModes){
+            this.addInnerLegendreMode(mode.el, mode.m, mode.magnitude);
+        }
     }
 
     public void setOuterP0(double P0){

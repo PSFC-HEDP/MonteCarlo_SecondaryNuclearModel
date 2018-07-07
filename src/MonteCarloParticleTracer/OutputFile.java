@@ -12,6 +12,11 @@ public class OutputFile extends File {
         super(s);
     }
 
+    public void clear() throws Exception{
+        FileWriter w = new FileWriter(this.getAbsoluteFile());
+        w.close();
+    }
+
     public void addHeader(String header) throws Exception{
 
         String centeredHeader = "* ";

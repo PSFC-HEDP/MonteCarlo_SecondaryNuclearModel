@@ -40,7 +40,7 @@ public class Utils {
         return new double[] {r, theta, phi};
     }
 
-    static Vector3D getVectorFromSpherical(double r, double theta, double phi){
+    public static Vector3D getVectorFromSpherical(double r, double theta, double phi){
         // Apache is in Math notation whilst we're in Physics notation
         return new SphericalCoordinates(r, phi, theta).getCartesian();
     }

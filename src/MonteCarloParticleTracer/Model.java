@@ -164,6 +164,15 @@ public class Model {
             logger.logTaskCompletion();
 
 
+            // Clear out the tallies (in case this simulation is being re-ran)
+            sourceParticlePositionTallies = null;
+            sourceParticleEnergyTallies = null;
+            sourceParticleTimeTallies = null;
+            productParticlePositionTallyMap = null;
+            productParticleEnergyTallyMap = null;
+            productParticleTimeTallyMap = null;
+
+
 
             /**
              * Running the actual simulation
@@ -283,6 +292,9 @@ public class Model {
     }
 
     private void writeOutputFile() throws Exception {
+
+        // Clear any previous contents
+        outputFile.clear();
 
         // Add the log info
         outputFile.addHeader("Logs");
