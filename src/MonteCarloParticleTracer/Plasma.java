@@ -2,6 +2,7 @@ package MonteCarloParticleTracer;
 
 import cStopPow.DoubleVector;
 import cStopPow.StopPow_LP;
+import cStopPow.StopPow_Zimmerman;
 import org.apache.commons.math3.analysis.integration.TrapezoidIntegrator;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
@@ -11,6 +12,8 @@ import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.apache.commons.math3.util.FastMath;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
@@ -77,8 +80,14 @@ public class Plasma {
      * @param massDensity Mass density (in g/cc) evaluated at the radius nodes
      */
     public Plasma(double[] radiusNodes, double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
+        // Normalize the radii to [0, 1]
         DoubleArray normalizedRadii = new DoubleArray(radiusNodes);
+        normalizedRadii.subtract(normalizedRadii.getMin());
         normalizedRadii.multiply(1.0 / normalizedRadii.getMax());
+
+        // Floating point issues, we need to edges to be EXACTLY [0, 1]
+        normalizedRadii.set(0, 0);
+        normalizedRadii.set(normalizedRadii.length()-1, 1);
 
         this.ionTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), ionTemperature);
         this.electronTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), electronTemperature);
@@ -229,16 +238,22 @@ public class Plasma {
                 speciesTs.add(Ti);
             }
 
-            //StopPow_Zimmerman stopPow_zimmerman = new StopPow_Zimmerman(testParticle.getA(), testParticle.getZ(),
-            //        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
-            //dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(testParticle.getEnergy());
+
 
             if (testParticle.getZ() == 0){
                 dEdx[i] = 0.0;
             }else {
+
+                /*
+                StopPow_Zimmerman stopPow_zimmerman = new StopPow_Zimmerman(testParticle.getMass(), testParticle.getZ(),
+                        speciesAs, speciesZs, speciesTs, speciesNs, speciesZbars, Te);
+                dEdx[i] = 1e4 * stopPow_zimmerman.dEdx_MeV_um(energy);
+                */
+
                 StopPow_LP stopPow_lp = new StopPow_LP(testParticle.getMass(), testParticle.getZ(),
                         speciesAs, speciesZs, speciesTs, speciesNs, Te);
                 dEdx[i] = 1e4 * stopPow_lp.dEdx_MeV_um(energy);
+
             }
         }
 
@@ -287,6 +302,42 @@ public class Plasma {
         return radius;
     }
 
+    public void DEBUG_dumpOuterBounds(){
+        try {
+            FileWriter w = new FileWriter("bounds.csv");
+
+            double[] theta = DoubleArray.linspace(0, Math.PI, 501).getValues();
+            double[] phi   = DoubleArray.linspace(0, 2*Math.PI, 501).getValues();
+
+            for (int i = 0; i < theta.length; i++){
+                w.write("," + theta[i]);
+            }
+            w.write("\n");
+
+            for (int j = 0; j < phi.length; j++){
+                w.write("" + phi[j]);
+
+                for (int i = 0; i < theta.length; i++){
+                    w.write("," + getOuterRadiusBound(theta[i], phi[i]));
+                }
+                w.write("\n");
+            }
+
+            w.close();
+
+        }
+        catch (IOException e){
+            e.printStackTrace();
+        }
+
+    }
+
+    public void DEBUG_printOuterModes(){
+        for (LegendreMode mode : outerBoundaryLegendreModes){
+            System.out.println(mode.el + " " + mode.m + " " + mode.magnitude + " " + mode.norm * mode.magnitude);
+        }
+    }
+
     double[] getRadiusNodes(double theta, double phi){
         double[] rN = getNormalizedRadiusNodes();
         double rMin = getInnerRadiusBound(theta, phi);
@@ -301,6 +352,7 @@ public class Plasma {
     }
 
     public double getArealDensity(double theta, double phi){
+
         TrapezoidIntegrator integrator = new TrapezoidIntegrator();
         double value = integrator.integrate(Integer.MAX_VALUE, massDensity, 0, 1);
 
@@ -340,6 +392,7 @@ public class Plasma {
                 return ionTemperature.value(maxValue);
             }
 
+            e.printStackTrace();
             System.err.printf("Warning! Ion temperature evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
         }
 
@@ -682,16 +735,16 @@ public class Plasma {
     Distribution getPolarDistribution(){
 
         final int NUM_THETA_NODES = 201;
-        double[] theta  = DoubleArray.linspace(0, Math.PI, NUM_THETA_NODES).getValues();
-        double[] length = new double[theta.length];
+        double[] theta  = DoubleArray.linspace(1e-6, Math.PI-1e-6, NUM_THETA_NODES).getValues();
+        double[] probability = new double[theta.length];
 
         for (int i = 0; i < theta.length; i++){
             double Rmin = getInnerRadiusBound(theta[i], 0.0);
             double Rmax = getOuterRadiusBound(theta[i], 0.0);
-            length[i] = Rmax - Rmin;
+            probability[i] = Math.sin(theta[i]) * (Rmax - Rmin);
         }
 
-        return new Distribution(theta, length);
+        return new Distribution(theta, probability);
 
     }
 
@@ -914,7 +967,7 @@ public class Plasma {
     // Private methods for multiplying the profiles by scalar constants
     // ****************************************************************
 
-    private void multiplyMassDensityByScalar(double scalar){
+    public void multiplyMassDensityByScalar(double scalar){
         PolynomialFunction constantPoly = new PolynomialFunction(new double[] {scalar});
 
         PolynomialFunction[] polynomialFunctions = massDensity.getPolynomials();
@@ -925,7 +978,7 @@ public class Plasma {
         massDensity = new PolynomialSplineFunction(massDensity.getKnots(), polynomialFunctions);
     }
 
-    private void multiplyIonTemperatureByScalar(double scalar){
+    public void multiplyIonTemperatureByScalar(double scalar){
         PolynomialFunction constantPoly = new PolynomialFunction(new double[] {scalar});
 
         PolynomialFunction[] polynomialFunctions = ionTemperature.getPolynomials();
@@ -936,7 +989,7 @@ public class Plasma {
         ionTemperature = new PolynomialSplineFunction(ionTemperature.getKnots(), polynomialFunctions);
     }
 
-    private void multiplyElectronTemperatureByScalar(double scalar){
+    public void multiplyElectronTemperatureByScalar(double scalar){
         PolynomialFunction constantPoly = new PolynomialFunction(new double[] {scalar});
 
         PolynomialFunction[] polynomialFunctions = electronTemperature.getPolynomials();
@@ -1078,10 +1131,12 @@ public class Plasma {
 
                             // Multiply all of the weight functions
                             for (Method weight : weightFunctions){
+                                //System.out.println(weight.getName() + " " + vectors[nodeIndex] + " " + weight.invoke(this, vectors[nodeIndex]));
                                 value *= (double) weight.invoke(this, vectors[nodeIndex]);
                             }
 
                             integral += value;
+
                         }
                     }
                 }

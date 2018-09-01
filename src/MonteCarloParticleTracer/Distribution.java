@@ -1,6 +1,7 @@
 package MonteCarloParticleTracer;
 
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.exception.OutOfRangeException;
 import org.apache.commons.math3.stat.descriptive.summary.Sum;
@@ -33,6 +34,22 @@ public class Distribution {
         for (int i = 0; i < nodes.length; i++){
             double power = -0.5*Math.pow((nodes[i] - mu)/sigma, 2);
             probabilities[i] = Math.exp(power);
+        }
+
+        return new Distribution(nodes, probabilities);
+    }
+
+    public static Distribution positiveNormDistribution(double sigma){
+        final int NUM_SIGMAS_OUT = 5;
+        double a = Math.min(sigma*NUM_SIGMAS_OUT, 1.0);
+
+        double[] nodes = DoubleArray.linspace(-a, a, NUM_NODES_FOR_PRESETS).getValues();
+        double[] probabilities = new double[NUM_NODES_FOR_PRESETS];
+
+        for (int i = 0; i < nodes.length; i++){
+            double power = -0.5*Math.pow((nodes[i])/sigma, 2);
+            probabilities[i] = Math.exp(power);
+
         }
 
         return new Distribution(nodes, probabilities);

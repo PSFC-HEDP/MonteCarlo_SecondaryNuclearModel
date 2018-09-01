@@ -37,6 +37,14 @@ public class Utils {
         double theta = coordinates.getPhi();
         double phi   = coordinates.getTheta();
 
+        if (Double.isNaN(theta)){
+            theta = 0.0;
+        }
+
+        if (Double.isNaN(phi)){
+            phi = 0.0;
+        }
+
         return new double[] {r, theta, phi};
     }
 

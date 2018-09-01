@@ -1,6 +1,7 @@
 package SecondaryDTnAnalysisGUI;
 
 import MonteCarloParticleTracer.ParticleType;
+import PlottingAPI.Figure;
 
 import javax.swing.*;
 import java.awt.*;
@@ -140,7 +141,7 @@ public class GUI extends JFrame implements WindowListener {
         super("Secondary DTn Analysis GUI");
         setupActionListeners();
         buildMainWindow();
-        loadData(Temp_Database.data[4]);
+        loadData(Temp_Database.data[12]);
     }
 
 
@@ -671,14 +672,15 @@ public class GUI extends JFrame implements WindowListener {
             return;
         }
 
-        // Calculate the yield ratio
-        final double ratio = Y2n / Y1n;
-        final double ratio_Unc = ratio * Math.sqrt( Math.pow(Y1n_Unc/Y1n, 2) + Math.pow(Y2n_Unc/Y2n, 2) );
 
 
-        // Need to cast the temperature to final variables
-        final double finalTe     = Te;
-        final double finalTe_Unc = Te_Unc;
+        // Need to cast stuff to final variables
+        final double finalY1n     = Y1n;
+        final double finalY1n_Unc = Y1n_Unc;
+        final double finalY2n     = Y2n;
+        final double finalY2n_Unc = Y2n_Unc;
+        final double finalTe      = Te;
+        final double finalTe_Unc  = Te_Unc;
 
 
         // Build the capsule object
@@ -692,9 +694,10 @@ public class GUI extends JFrame implements WindowListener {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                analyzer.doAnalysis(ratio, ratio_Unc, finalTe, finalTe_Unc);
+                analyzer.doAnalysis(finalY1n, finalY1n_Unc, finalY2n, finalY2n_Unc, finalTe, finalTe_Unc);
             }
         });
+
 
         // Run the analysis
         thread.start();

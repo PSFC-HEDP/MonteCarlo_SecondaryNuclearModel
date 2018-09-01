@@ -1,7 +1,9 @@
 package SecondaryDTnAnalysisGUI;
 
-import MonteCarloParticleTracer.Plasma;
-import MonteCarloParticleTracer.SecondaryDTnModel;
+import MonteCarloParticleTracer.*;
+import PlottingAPI.Figure;
+import PlottingAPI.LineProperties;
+import PlottingAPI.ShapeProperties;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
@@ -36,10 +38,21 @@ public class Analyzer {
     }
 
 
-    public void doAnalysis(double measuredRatio, double ratioUncertainty, double temperature, double temperatureUncertainty) {
+    public void doAnalysis(double primaryYield, double primaryYieldUncertainty,
+                           double secondaryYield, double secondaryYieldUncertainty,
+                           double temperature, double temperatureUncertainty) {
 
         // Disable the GUI
         parentGUI.setAnalysisEnabled(false);
+
+        // Calculate the yield ratio
+        final double measuredRatio = secondaryYield / primaryYield;
+        final double ratioUncertainty =
+                measuredRatio * Math.sqrt(
+                        Math.pow(primaryYieldUncertainty/primaryYield, 2) +
+                        Math.pow(secondaryYieldUncertainty/secondaryYield, 2)
+        );
+
 
 
         // ***********************************
@@ -133,6 +146,39 @@ public class Analyzer {
         parentGUI.writeToLog(" === DONE! === ");
 
 
+        // ************
+        // Plot spectra
+        // ************
+
+        Tally data = nominalResult.tritonBirthTally;
+        data.multiply(primaryYield);
+
+        Figure tritonFigure = new Figure("Triton Spectra", "Energy (MeV)", "Yield per Bin");
+        tritonFigure.scatter(data.getBinCenters(), data.getWeights(), ShapeProperties.blackSquare(5.0, 2.0));
+        tritonFigure.yErrorbars(data.getBinCenters(), data.getWeights(), data.getUncertainties(), LineProperties.blackLine(1.0));
+
+
+        data = nominalResult.tritionEscapeTally;
+        data.multiply(primaryYield);
+
+        tritonFigure.scatter(data.getBinCenters(), data.getWeights(), ShapeProperties.redSquare(5.0, 2.0));
+        tritonFigure.yErrorbars(data.getBinCenters(), data.getWeights(), data.getUncertainties(), LineProperties.blackLine(1.0));
+
+
+        data = nominalResult.secondaryDTnTally;
+        data.multiply(primaryYield);
+
+        Figure neutronFigure = new Figure("Secondary DT Spectrum", "Energy (MeV)", "Yield per Bin");
+        neutronFigure.scatter(data.getBinCenters(), data.getWeights());
+        neutronFigure.yErrorbars(data.getBinCenters(), data.getWeights(), data.getUncertainties(), LineProperties.blackLine(1.0));
+
+
+        tritonFigure.setLocation(parentGUI.getLocation());
+        tritonFigure.setSize(600, 400);
+
+        neutronFigure.setLocation(parentGUI.getLocation());
+        neutronFigure.setSize(600, 400);
+
         // Re-enable the GUI
         parentGUI.setAnalysisEnabled(true);
 
@@ -177,11 +223,8 @@ public class Analyzer {
         // Run the simulation
         model.runSimulation(numParticles, numCPUs);
 
-        // Get the yield ratio
-        double yieldRatio = model.getYieldRatio();
-
         // Return the simulation results
-        return new SimulationResult(Te, CR, yieldRatio, fuelPlasma);
+        return new SimulationResult(Te, CR, fuelPlasma, model);
 
     }
 
@@ -232,17 +275,25 @@ public class Analyzer {
         private double density;
         private double fuelRadius;
 
+        private Tally tritonBirthTally;
+        private Tally tritionEscapeTally;
+        private Tally secondaryDTnTally;
 
-        SimulationResult(double temperature, double fuelConvergence, double yieldRatio, Plasma fuelPlasma) {
+
+        SimulationResult(double temperature, double fuelConvergence, Plasma fuelPlasma, SecondaryDTnModel model) {
 
             this.fuelConvergence = fuelConvergence;
             this.temperature = temperature;
-            this.yieldRatio = yieldRatio;
 
             this.arealDensity = fuelPlasma.getArealDensity(0.0, 0.0);
             this.capsuleConvergence = capsule.getCapsuleConvergence(fuelConvergence);
             this.density = fuelPlasma.getMassDensity(new Vector3D(0.0, 0.0, 0.0));
             this.fuelRadius = fuelPlasma.getOuterRadiusBound(0.0, 0.0);
+
+            this.yieldRatio = model.getYieldRatio();
+            this.tritonBirthTally = model.getTritonSourceSpectrum();
+            this.tritionEscapeTally = model.getTritionEscapeSpectrum();
+            this.secondaryDTnTally = model.getSecondaryDTNeutronSpectrum();
 
         }
 

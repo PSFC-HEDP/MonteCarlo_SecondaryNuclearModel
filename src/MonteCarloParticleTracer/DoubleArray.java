@@ -37,6 +37,10 @@ public class DoubleArray {
         return values[i];
     }
 
+    public void set(int i, double value){
+        this.values[i] = value;
+    }
+
     public int length(){
         return values.length;
     }
@@ -52,7 +56,7 @@ public class DoubleArray {
     public double getMin(){
         double minValue = Double.MAX_VALUE;
         for (double value : values) {
-            minValue = Math.max(minValue, value);
+            minValue = Math.min(minValue, value);
         }
         return minValue;
     }
@@ -60,6 +64,18 @@ public class DoubleArray {
     public void multiply(double scalar){
         for (int i = 0; i < values.length; i++){
             values[i] *= scalar;
+        }
+    }
+
+    public void add(double scalar){
+        for (int i = 0; i < values.length; i++){
+            values[i] += scalar;
+        }
+    }
+
+    public void subtract(double scalar){
+        for (int i = 0; i < values.length; i++){
+            values[i] -= scalar;
         }
     }
 

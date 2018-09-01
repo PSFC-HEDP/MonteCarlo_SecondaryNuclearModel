@@ -70,6 +70,7 @@ public class SimulationThread extends Thread {
     // Logger object for keeping track of this threads process
     private Logger logger = new Logger(false);
 
+    private boolean hotspot   = false;
     private boolean debugMode = false;
 
 
@@ -87,10 +88,10 @@ public class SimulationThread extends Thread {
     /**
      * Method for setting the source information
      * @param sourcePlasma Plasma where the source particles originate
-     * @param reactivity Reactivity of the reaction the generates the source particles
+     * @param radialSourceDistribution Radial distribution to same source particles from
      * @param sourceReaction Reaction that we use to sample the source particles
      */
-    void setSourceInformation(Plasma sourcePlasma, Reactivity reactivity, NuclearReaction sourceReaction){
+    void setSourceInformation(Plasma sourcePlasma, NuclearReaction sourceReaction, Distribution radialSourceDistribution){
 
         // If the plasma bounds vary in phi, we need to proper 2D distribution for the angular dependence
         if (sourcePlasma.boundsVaryInPhi()){
@@ -105,15 +106,21 @@ public class SimulationThread extends Thread {
 
         }
 
-        // Generate the radial distribution using the reactivity
-        this.radialSourceDistribution = sourcePlasma.getRadialBurnDistribution(reactivity);
-        //this.radialSourceDistribution = Distribution.deltaFunction(1e-36);      // TODO this is a temp way to invoke hotspot
+        // Set the radial distribution
+        this.radialSourceDistribution = radialSourceDistribution;
+        //this.radialSourceDistribution = sourcePlasma.getRadialBurnDistribution(reactivity);
+
 
 
         // Set the source plasma and reaction (make unique copies)
         this.sourcePlasma   = sourcePlasma.copy();
         this.sourceReaction = sourceReaction.copy();
 
+    }
+
+
+    void setRadialSourceDistribution(Distribution radialSourceDistribution){
+        this.radialSourceDistribution = radialSourceDistribution;
     }
 
 
@@ -214,7 +221,7 @@ public class SimulationThread extends Thread {
             double bias   = weight;
 
             if (detectorLineOfSight != null) {
-                bias *= particle.getEnergy();   // TODO: Adhoc correction
+                //bias *= particle.getEnergy();   // TODO: Adhoc correction
             }
 
 
@@ -293,8 +300,6 @@ public class SimulationThread extends Thread {
         double particleReactionProb = 0.0;
         double initialEnergy = particle.getEnergy();
 
-        //System.out.println("START");
-
 
         // While the particle is inside this plasma
         while (distance > dx && particle.getEnergy() >  0.0) {
@@ -319,8 +324,6 @@ public class SimulationThread extends Thread {
             // Calculate r2 before the energy loop to save time
             double r2 = Utils.getNormalizedRadius(particle.step(dx, 0.0), plasma);
             if (debugMode)  logger.stopTimer("Determine next position");
-
-            //System.out.println(distance + " " + r2);
 
 
             // Use trapezoidal method to iterate onto the particle's final energy
@@ -482,7 +485,7 @@ public class SimulationThread extends Thread {
     void setUpTallies(){
 
         // Build the source position tallies
-        double[] positionNodes = DoubleArray.linspace(0.0, 75.0*1e-4, 200).getValues();      // TODO HARD CODED!
+        double[] positionNodes = DoubleArray.linspace(0.0, sourcePlasma.getOuterRadiusBound(0.0, 0.0), 200).getValues();      // TODO HARD CODED!
         sourceParticlePositionTallies = new Tally[plasmaData.size() + 1];
         for (int i =0; i < sourceParticlePositionTallies.length; i++){
             sourceParticlePositionTallies[i] = new Tally(positionNodes);
@@ -570,13 +573,13 @@ public class SimulationThread extends Thread {
 
         // If we have a polar distribution, use it instead
         if (polarSourceDistribution != null){
-            //theta = polarSourceDistribution.sample();
-            //position = Utils.getVectorFromSpherical(1.0, theta, phi);
+            theta = polarSourceDistribution.sample();
+            position = Utils.getVectorFromSpherical(1.0, theta, phi);
         }
 
 
         // Use our radial distribution and the plasma bounds to determine the magnitude of our position vector
-        double rNorm = radialSourceDistribution.sample();
+        double rNorm = Math.abs(radialSourceDistribution.sample());         // TODO: Temp bug fix
         double rMax  = sourcePlasma.getOuterRadiusBound(theta, phi);
         double rMin  = sourcePlasma.getInnerRadiusBound(theta, phi);
 
@@ -588,8 +591,8 @@ public class SimulationThread extends Thread {
 
 
         // Sample the direction
-        Vector3D direction = Utils.sampleRandomNormalizedVector();
-
+        //Vector3D direction = Utils.sampleRandomNormalizedVector();
+        Vector3D direction = detectorLineOfSight;
 
         // Build the energy distribution based on our position in the plasma
         double mu = sourceReaction.getZeroTemperatureMeanEnergy();              // TODO: Include temperature up-shift

@@ -23,8 +23,11 @@ public class Model {
     // Nuclear reaction from which the source particles will originate
     private NuclearReaction sourceNuclearReaction;
 
-    // Reactivity of the source particle (used to establish the spatial profile)
+    // Reactivity of the source particle (ALTERNATIVE WAY TO SET THE RADIAL DISTRIBUTION)
     private Reactivity sourceReactivity;
+
+    // Radial distribution from which to sample the source particle (ALTERNATIVE TO REACTIVITY METHOD)
+    private Distribution sourceRadialDistribution;
 
     // An ORDERED array list of all the plasmas in this model
     private ArrayList<Plasma> plasmas = new ArrayList<>();
@@ -42,9 +45,9 @@ public class Model {
     private Logger logger = new Logger(false);
 
     // DoubleArray of tallies for the source particles (1 tally for birth, and 1 for every surface)
-    private Tally[] sourceParticlePositionTallies = null;
-    private Tally[] sourceParticleEnergyTallies = null;
-    private Tally[] sourceParticleTimeTallies = null;
+    Tally[] sourceParticlePositionTallies = null;
+    Tally[] sourceParticleEnergyTallies = null;
+    Tally[] sourceParticleTimeTallies = null;
 
     // HashMap of tally arrays for every nuclear reaction we model
     HashMap<NuclearReaction, Tally[]> productParticlePositionTallyMap = null;
@@ -71,6 +74,12 @@ public class Model {
     public void setSourceInformation(NuclearReaction sourceNuclearReaction, Reactivity sourceReactivity) {
         this.sourceNuclearReaction = sourceNuclearReaction;
         this.sourceReactivity = sourceReactivity;
+        this.sourceRadialDistribution = null;
+    }
+
+    public void setSourceInformation(NuclearReaction sourceNuclearReaction, Distribution radialDistribution) {
+        this.sourceNuclearReaction = sourceNuclearReaction;
+        this.sourceRadialDistribution = radialDistribution;
     }
 
 
@@ -123,14 +132,30 @@ public class Model {
              * Verification and data organization
              */
 
-            // Verify that the source information has been set
-            if (sourceNuclearReaction == null || sourceReactivity == null)
-                throw new Exceptions.NoSourceInformationException();
-
-
             // Verify that we have a plasma
             if (plasmas.size() == 0)
                 throw new Exceptions.NoPlasmaSpecifiedException();
+
+
+            // Verify that the source reaction has been set
+            if (sourceNuclearReaction == null)
+                throw new Exceptions.NoSourceInformationException();
+
+            // Verify that the radial distribution has been set
+            if (sourceRadialDistribution == null){
+
+                if (sourceReactivity != null){
+                    sourceRadialDistribution = plasmas.get(0).getRadialBurnDistribution(sourceReactivity);
+                    //System.out.println(plasmas.get(0));
+                    //System.out.println(sourceRadialDistribution);
+                }
+                else {
+                    throw new Exceptions.NoSourceInformationException();
+                }
+            }
+
+
+
 
 
             // Verify this machine has enough processors
@@ -188,7 +213,7 @@ public class Model {
                 logger.addLog("Started thread " + threads[i].getId());
 
                 // Add the source and tally info
-                threads[i].setSourceInformation(plasmas.get(0), sourceReactivity, sourceNuclearReaction);
+                threads[i].setSourceInformation(plasmas.get(0), sourceNuclearReaction, sourceRadialDistribution);
                 threads[i].setDetectorLineOfSight(detectorLineOfSight);
 
                 // Add the plasma data
