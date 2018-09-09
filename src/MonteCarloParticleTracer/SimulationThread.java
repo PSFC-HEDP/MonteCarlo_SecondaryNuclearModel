@@ -58,8 +58,12 @@ public class SimulationThread extends Thread {
     private HashMap<NuclearReaction, Tally[]> productParticleEnergyTallyMap   = new HashMap<>();
     private HashMap<NuclearReaction, Tally[]> productParticleTimeTallyMap     = new HashMap<>();
 
-    // Position where the data will be tallied (averages over 4pi if null)
-    private Vector3D detectorLineOfSight;
+    // The vector that all source particles will be forced to travel
+    // Secondary reactions cannot be trusted when this is used
+    private Vector3D sourceDirection = null;
+
+    // The vector that all secondary reactions will be forced to travel
+    private Vector3D productDirection = null;
 
     // Number of particles simulated by this thread
     private int numParticles;
@@ -70,7 +74,7 @@ public class SimulationThread extends Thread {
     // Logger object for keeping track of this threads process
     private Logger logger = new Logger(false);
 
-    private boolean hotspot   = false;
+    // Debug mode flag
     private boolean debugMode = false;
 
 
@@ -108,7 +112,6 @@ public class SimulationThread extends Thread {
 
         // Set the radial distribution
         this.radialSourceDistribution = radialSourceDistribution;
-        //this.radialSourceDistribution = sourcePlasma.getRadialBurnDistribution(reactivity);
 
 
 
@@ -133,13 +136,17 @@ public class SimulationThread extends Thread {
     }
 
 
-    /**
-     * Method for setting the detector line of sight (not required)
-     * @param detectorLineOfSight Physical location of the tallies (can be null)
-     */
-    void setDetectorLineOfSight(Vector3D detectorLineOfSight) {
-        this.detectorLineOfSight = detectorLineOfSight;
+
+    public void setSourceDirection(Vector3D sourceDirection) {
+        this.sourceDirection = sourceDirection;
     }
+
+
+
+    public void setProductDirection(Vector3D productDirection) {
+        this.productDirection = productDirection;
+    }
+
 
 
     @Override
@@ -159,7 +166,7 @@ public class SimulationThread extends Thread {
 
             // Sample a particle
             if (debugMode)  logger.startTimer("Sample source particle");
-            Particle particle = sample(birthWeight);
+            Particle particle = sample(birthWeight, sourceDirection);
             if (debugMode)  logger.stopTimer("Sample source particle");
 
             // Simulate this particle
@@ -219,10 +226,6 @@ public class SimulationThread extends Thread {
             // Figure out the weight and bias of this particle for tallies
             double weight = particle.getWeight();
             double bias   = weight;
-
-            if (detectorLineOfSight != null) {
-                //bias *= particle.getEnergy();   // TODO: Adhoc correction
-            }
 
 
             // If we're at the inner boundary, we need to move down to the next inner plasma
@@ -389,7 +392,7 @@ public class SimulationThread extends Thread {
 
                 // Generate the resultant particle
                 if (debugMode)  logger.startTimer("Generate secondary particle");
-                Particle productParticle = nuclearReaction.getProductParticle(particle, backgroundParticle, detectorLineOfSight);
+                Particle productParticle = nuclearReaction.getProductParticle(particle, backgroundParticle, productDirection);
                 productParticle.multiplyWeight(particle.getWeight());       // Normalize it to the weigh of it's parent
                 if (debugMode)  logger.stopTimer("Generate secondary particle");
 
@@ -560,7 +563,7 @@ public class SimulationThread extends Thread {
         }
     }
 
-    private Particle sample(double birthWeight){
+    private Particle sample(double birthWeight, Vector3D direction){
 
         // Start by sampling a spherically random normal vector
         Vector3D position = Utils.sampleRandomNormalizedVector();
@@ -591,8 +594,9 @@ public class SimulationThread extends Thread {
 
 
         // Sample the direction
-        //Vector3D direction = Utils.sampleRandomNormalizedVector();
-        Vector3D direction = detectorLineOfSight;
+        if (direction == null) {
+            direction = Utils.sampleRandomNormalizedVector();
+        }
 
         // Build the energy distribution based on our position in the plasma
         double mu = sourceReaction.getZeroTemperatureMeanEnergy();              // TODO: Include temperature up-shift

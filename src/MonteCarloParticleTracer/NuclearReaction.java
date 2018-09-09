@@ -134,6 +134,8 @@ public class NuclearReaction {
 
         // Build the  particle of type C born at the same position as A with the forced direction and our derived energy
         Particle productParticle = new Particle(C, A.getPosition(), direction, productEnergy_Lab, A.getTime());
+
+        // Normalization associated with forcing direction
         productParticle.multiplyWeight(productEnergy_Lab / productEnergy_CoM);
 
         return productParticle;

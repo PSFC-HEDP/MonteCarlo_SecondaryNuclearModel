@@ -35,8 +35,12 @@ public class Model {
     // An array list of all nuclear reactions we'll simulate in this model
     private ArrayList<NuclearReaction> nuclearReactions = new ArrayList<>();
 
-    // The line of sight where tallies will be done (can be null) TODO: Consider an array list for multiple tallies
-    private Vector3D detectorLineOfSight;
+    // The vector that all source particles will be forced to travel
+    // Secondary reactions cannot be trusted when this is used
+    private Vector3D sourceDirection = null;
+
+    // The vector that all secondary reactions will be forced to travel
+    private Vector3D productDirection = null;
 
     // Threads that this model interacts with
     private SimulationThread[] threads;
@@ -110,11 +114,19 @@ public class Model {
 
 
     /**
-     * Method to set the physical location of the tallys. If not set, tallys will be averaged over 4pi.
-     * @param detectorLineOfSight Physical tally location
+     * Method to force all source particles to go in a particular direction
+     * @param sourceDirection direction that ALL source particles will travel
      */
-    public void setDetectorLineOfSight(Vector3D detectorLineOfSight) {
-        this.detectorLineOfSight = detectorLineOfSight;
+    public void setSourceDirection(Vector3D sourceDirection) {
+        this.sourceDirection = sourceDirection;
+    }
+
+    /**
+     * Method to force all product particles to go in a particular direction
+     * @param productDirection direction that ALL product particles will travel
+     */
+    public void setProductDirection(Vector3D productDirection) {
+        this.productDirection = productDirection;
     }
 
 
@@ -146,16 +158,15 @@ public class Model {
 
                 if (sourceReactivity != null){
                     sourceRadialDistribution = plasmas.get(0).getRadialBurnDistribution(sourceReactivity);
-                    //System.out.println(plasmas.get(0));
-                    //System.out.println(sourceRadialDistribution);
                 }
                 else {
                     throw new Exceptions.NoSourceInformationException();
                 }
             }
 
-
-
+            // Verify that no nuclear reactions are being used if we're forcing the source direction
+            if (sourceDirection != null && nuclearReactions.size() > 0)
+                throw new Exceptions.InvalidNuclearReactionModelException();
 
 
             // Verify this machine has enough processors
@@ -214,7 +225,8 @@ public class Model {
 
                 // Add the source and tally info
                 threads[i].setSourceInformation(plasmas.get(0), sourceNuclearReaction, sourceRadialDistribution);
-                threads[i].setDetectorLineOfSight(detectorLineOfSight);
+                threads[i].setSourceDirection(sourceDirection);
+                threads[i].setProductDirection(productDirection);
 
                 // Add the plasma data
                 for (PlasmaData data : plasmaData) {

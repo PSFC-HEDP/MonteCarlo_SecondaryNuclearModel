@@ -28,5 +28,9 @@ public class Exceptions {
         }
     }
 
+    static class InvalidNuclearReactionModelException extends Exception {
+        InvalidNuclearReactionModelException() { super("Nuclear reactions cannot be supported with forced source particle directions");}
+    }
+
 
 }

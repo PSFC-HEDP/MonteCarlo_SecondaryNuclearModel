@@ -702,6 +702,7 @@ public class Plasma {
     // ********************************
 
     Distribution getRadialBurnDistribution(Reactivity reactivity){
+
         double[] r = getNormalizedRadiusNodes();                  // Normalized r
         double[] Y = new double[r.length];              // Yield probability
 

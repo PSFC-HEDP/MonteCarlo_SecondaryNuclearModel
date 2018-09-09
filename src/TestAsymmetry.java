@@ -43,28 +43,28 @@ public class TestAsymmetry {
         neutronFigure.setSize(600, 400);
 
 
-        model.setDetectorLineOfSight(SPEC_SP);
+        model.setProductDirection(SPEC_SP);
         model.runSimulation((int) 1e5, 24);
         System.out.printf("%.4e ", model.getYieldRatio());
         Tally data = model.getSecondaryDTNeutronSpectrum();
         neutronFigure.plot(data.getBinCenters(), data.getWeights());
 
 
-        model.setDetectorLineOfSight(SPEC_A);
+        model.setProductDirection(SPEC_A);
         model.runSimulation((int) 1e5, 24);
         System.out.printf("%.4e ", model.getYieldRatio());
         data = model.getSecondaryDTNeutronSpectrum();
         neutronFigure.plot(data.getBinCenters(), data.getWeights());
 
 
-        model.setDetectorLineOfSight(SPEC_E);
+        model.setProductDirection(SPEC_E);
         model.runSimulation((int) 1e5, 24);
         System.out.printf("%.4e ", model.getYieldRatio());
         data = model.getSecondaryDTNeutronSpectrum();
         neutronFigure.plot(data.getBinCenters(), data.getWeights());
 
 
-        model.setDetectorLineOfSight(SPEC_NP);
+        model.setProductDirection(SPEC_NP);
         model.runSimulation((int) 1e5, 24);
         System.out.printf("%.4e ", model.getYieldRatio());data = model.getSecondaryDTNeutronSpectrum();
         neutronFigure.plot(data.getBinCenters(), data.getWeights());
