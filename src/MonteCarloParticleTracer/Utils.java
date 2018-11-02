@@ -11,6 +11,22 @@ public class Utils {
 
     private static final NormalDistribution NORMAL_DISTRIBUTION = new NormalDistribution();
 
+    static double[] removeElement(double[] array, int index){
+
+        double[] newArray = new double[array.length - 1];
+        for (int i = 0; i < array.length; i++){
+
+            if (i < index){
+                newArray[i] = array[i];
+            }
+
+            else if (i > index){
+                newArray[i-1] = array[i];
+            }
+        }
+        return newArray;
+    }
+
 
 
 

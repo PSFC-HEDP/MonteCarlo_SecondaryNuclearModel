@@ -364,7 +364,6 @@ public class Plasma {
     }
 
 
-
     // ***********************************************************************************
     // Getter methods that evaluate the plasma conditions at some specific position vector
     // ***********************************************************************************
@@ -459,6 +458,33 @@ public class Plasma {
 
     public double getIonNumberDensity(Vector3D r){
         return numberDensityFromRho(getMassDensity(r));
+    }
+
+    public double getElectronNumberDensity(Vector3D r){
+
+        // Init the electron density
+        double ne = 0;
+
+        // Get the total ion density
+        double n   = getIonNumberDensity(r);
+
+        // Loop through all the plasma species
+        for (PlasmaSpecies species : plasmaSpecies){
+
+            // Get the number fraction
+            double fi = species.getNumberFraction();
+
+            // Get the Zbar (using Drake ionization assumption)
+            double Zbar = 20*Math.sqrt(getIonTemperature(r));
+            Zbar = Math.min(Zbar, species.getZ());
+
+            // Add these electrons to the total
+            ne += (fi * n * Zbar);
+        }
+
+        // Return
+        return ne;
+
     }
 
     public double getSpeciesNumberDensity(Vector3D r, ParticleType type){
@@ -700,6 +726,47 @@ public class Plasma {
     // ********************************
     // Burn distribution getter methods
     // ********************************
+
+    Distribution getRadialBremDistribution(){
+
+        double[] r = getNormalizedRadiusNodes();                // Normalized r
+        double[] J = new double[r.length];                      // Brem probability
+
+        for (int i = 0; i < r.length; i++) {
+
+            // Get the plasma conditions at this position
+            double n = numberDensityFromRho(massDensity.value(r[i]));
+            double Ti = ionTemperature.value(r[i]);
+            double Te = electronTemperature.value(r[i]);
+
+
+            // Loop through the plasma species
+            double ni_Z_2 = 0, ne = 0;
+            for (PlasmaSpecies species : plasmaSpecies) {
+
+                // Get the number fraction
+                double fi = species.getNumberFraction();
+
+                // Get the Zbar (using Drake ionization assumption)
+                double Zbar = 20 * Math.sqrt(Ti);
+                Zbar = Math.min(Zbar, species.getZ());
+
+                // Add this species to the n_i Z^2 term
+                ni_Z_2 += (fi * n * Zbar * Zbar);
+
+                // Add this species to the n_i Z (ne) term
+                ne += (fi * n * Zbar);
+
+            }
+
+            // Brem is (ne ni Z^2) * Te^(1/2). r^2 factor because spherical
+            J[i] = r[i] * r[i] * ne * ni_Z_2 * Math.sqrt(Te);
+
+        }
+
+        return new Distribution(r, J);
+
+    }
 
     Distribution getRadialBurnDistribution(Reactivity reactivity){
 
@@ -1059,7 +1126,6 @@ public class Plasma {
 
                             // Multiply all of the weight functions
                             for (Method weight : weightFunctions){
-                                //System.out.println(weight.getName() + " " + vectors[nodeIndex] + " " + weight.invoke(this, vectors[nodeIndex]));
                                 value *= (double) weight.invoke(this, vectors[nodeIndex]);
                             }
 

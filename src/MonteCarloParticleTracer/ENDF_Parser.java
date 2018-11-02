@@ -1,6 +1,5 @@
 package MonteCarloParticleTracer;
 
-import com.sun.org.apache.bcel.internal.generic.IF_ACMPEQ;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
@@ -10,7 +9,7 @@ import java.util.Scanner;
 
 public class ENDF_Parser {
 
-    private final double NUETRON_MASS_AMU = 1.008664;
+    private final double NEUTRON_MASS_AMU = 1.008664;
     private File ENDF_File;
 
 
@@ -59,7 +58,7 @@ public class ENDF_Parser {
 
                 Z = (int) Math.floor(toDouble(entries[0]) / 1000);
                 A = (int) Math.round(toDouble(entries[0])) - 1000*Z;
-                mass = NUETRON_MASS_AMU * toDouble(entries[1]);
+                mass = NEUTRON_MASS_AMU * toDouble(entries[1]);
 
 
 
@@ -129,6 +128,10 @@ public class ENDF_Parser {
                 // Build the cross section function
                 crossSection = new LinearInterpolator().interpolate(energies, values);
 
+                for (int i = 0; i < energies.length; i++){
+                    System.out.println(energies[i] + " " + values[i]);
+                }
+
 
 
             }
@@ -144,7 +147,7 @@ public class ENDF_Parser {
 
                 Z = (int) Math.floor(toDouble(entries[0]) / 1000);
                 A = (int) Math.round(toDouble(entries[0])) - 1000*Z;
-                mass = NUETRON_MASS_AMU * toDouble(entries[1]);
+                mass = NEUTRON_MASS_AMU * toDouble(entries[1]);
                 int LTT = Integer.valueOf(entries[3]);
 
                 if (LTT == 2)         System.err.println("Tabulated angle distributions not supported!");
@@ -158,7 +161,7 @@ public class ENDF_Parser {
 
                 entries = getEntries(s.nextLine());
 
-                mass = NUETRON_MASS_AMU * toDouble(entries[1]);
+                mass = NEUTRON_MASS_AMU * toDouble(entries[1]);
                 int LI  = Integer.valueOf(entries[2]);
                 int LCT = Integer.valueOf(entries[3]);
 

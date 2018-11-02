@@ -1,8 +1,10 @@
 package MonteCarloParticleTracer;
 
+import PlottingAPI.ArrayUtils;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+import org.apache.commons.math3.exception.NonMonotonicSequenceException;
 import org.apache.commons.math3.exception.OutOfRangeException;
 import org.apache.commons.math3.stat.descriptive.summary.Sum;
 import org.apache.commons.math3.util.FastMath;
@@ -67,17 +69,31 @@ public class Distribution {
 
     public Distribution(double[] nodes, double[] frequencies) {
 
-        // Normalize the frequencies
-        frequencies = normalize(frequencies);
+        while (true) {
+            try {
+
+                // Normalize the frequencies
+                frequencies = normalize(frequencies);
 
 
-        // Calculate the cumulative probabilities
-        double[] cumulativeProbabilities = calculateCumuProbability(frequencies);
+                // Calculate the cumulative probabilities
+                double[] cumulativeProbabilities = calculateCumuProbability(frequencies);
 
 
-        // Set the probability functions
-        probability = new LinearInterpolator().interpolate(nodes, frequencies);
-        inverseCumulativeProbability = new LinearInterpolator().interpolate(cumulativeProbabilities, nodes);
+                // Set the probability functions
+                probability = new LinearInterpolator().interpolate(nodes, frequencies);
+                inverseCumulativeProbability = new LinearInterpolator().interpolate(cumulativeProbabilities, nodes);
+
+                // If we're here, we did it!
+                return;
+            }
+            catch (NonMonotonicSequenceException e) {
+
+                nodes = Utils.removeElement(nodes, e.getIndex());
+                frequencies = Utils.removeElement(frequencies, e.getIndex());
+
+            }
+        }
     }
 
 
