@@ -456,6 +456,10 @@ public class Plasma {
         return Double.NaN;
     }
 
+    public double getSpeciesMassDensity(Vector3D r, ParticleType type){
+        return getSpeciesNumberDensity(r, type) * type.getMass() * Constants.GRAMS_PER_AMU;
+    }
+
     public double getIonNumberDensity(Vector3D r){
         return numberDensityFromRho(getMassDensity(r));
     }

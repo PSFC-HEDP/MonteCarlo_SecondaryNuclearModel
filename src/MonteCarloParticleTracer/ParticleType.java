@@ -23,6 +23,8 @@ public class ParticleType {
 
     public static final ParticleType carbon = new ParticleType(Constants.CARBON_CHARGE, Constants.CARBON_MASS_AMU);
 
+    public static final ParticleType tungsten = new ParticleType(Constants.TUNGSTEN_CHARGE, Constants.TUNGSTEN_MASS_AMU);
+
 
     public ParticleType(int Z, double mass) {
         this.Z = Z;

@@ -82,7 +82,7 @@ public class XrayDetector {
 
     public Tally_2D generateImage(double[] xBins, double[] yBins, Plasma plasma){
 
-        final int NUM_X_RAYS = (int) 2e7;
+        final int NUM_X_RAYS = (int) 4e7;
 
 
         // Init the tally

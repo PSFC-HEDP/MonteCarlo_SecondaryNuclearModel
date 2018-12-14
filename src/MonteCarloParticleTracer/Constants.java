@@ -10,6 +10,7 @@ class Constants {
 
     static final double PROTON_MASS_KG = 1.6726219e-27;
     static final double MEV_PER_AMU = 931.5;
+    static final double GRAMS_PER_AMU = 1.66054e-24;
     static final double SPEED_OF_LIGHT_CM_PER_SEC = 2.998e+10;
     static final double BOLTZMANN_CONSTANT_J_PER_K = 1.38064852e-23;
 
@@ -23,6 +24,7 @@ class Constants {
     static final int HYDROGEN_CHARGE    = +1;
     static final int HELIUM_CHARGE      = +2;
     static final int CARBON_CHARGE      = +6;
+    static final int TUNGSTEN_CHARGE    = +74;
 
     static final double ELECTRON_MASS_AMU   = 0.00054858;
     static final double NEUTRON_MASS_AMU    = 1.00866491588;
@@ -32,6 +34,7 @@ class Constants {
     static final double HELIUM3_MASS_AMU    = 3.0160293 -   HELIUM_CHARGE*ELECTRON_MASS_AMU;
     static final double ALPHA_MASS_AMU      = 4.002602  -   HELIUM_CHARGE*ELECTRON_MASS_AMU;
     static final double CARBON_MASS_AMU     = 12.0107   -   CARBON_CHARGE*ELECTRON_MASS_AMU;
+    static final double TUNGSTEN_MASS_AMU   = 183.84    - TUNGSTEN_CHARGE*ELECTRON_MASS_AMU;
 
 
 

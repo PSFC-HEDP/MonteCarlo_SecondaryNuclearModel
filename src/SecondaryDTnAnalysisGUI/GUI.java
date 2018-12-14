@@ -141,7 +141,7 @@ public class GUI extends JFrame implements WindowListener {
         super("Secondary DTn Analysis GUI");
         setupActionListeners();
         buildMainWindow();
-        loadData(Temp_Database.data[19]);
+        loadData(Temp_Database.data[0]);
     }
 
 

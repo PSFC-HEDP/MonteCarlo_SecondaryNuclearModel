@@ -13,8 +13,8 @@ import java.util.Collections;
 
 public class Analyzer {
 
-    private Double INTIAL_CR_GUESS = 15.0;
-    private Double INITAL_CR_DELTA = 5.0;
+    private Double INTIAL_CR_GUESS = 10.0;
+    private Double INITAL_CR_DELTA = 2.0;
 
     private final Double   MAX_ERROR = 0.01;
 
@@ -131,6 +131,17 @@ public class Analyzer {
 
         parentGUI.writeToLog(" === Analysis Results === ");
 
+        parentGUI.writeFormattedToLog("d.uploadExternalAnalysis(name, [%.4e, %.4e, %.4e], [%.4e, %.4e, %.4e], [%.4e, %.4e, %.4e], [%.4e, %.4e, %.4e], 'Monte Carlo');",
+                1000*nominalResult.arealDensity, 1000*rhoR_Uncertainties[1], 1000*rhoR_Uncertainties[0],
+                nominalResult.capsuleConvergence, CR_Uncertainties[1], CR_Uncertainties[0],
+                nominalResult.density, rho_Uncertainties[1], rho_Uncertainties[0],
+                10000*nominalResult.fuelRadius, 10000*R_Uncertainties[1], 10000*R_Uncertainties[0]);
+
+        parentGUI.writeToLog(" === DONE! === ");
+
+        /*
+        parentGUI.writeToLog(" === Analysis Results === ");
+
         parentGUI.writeFormattedToLog("\u03c1R (mg/cm^2) = %.1f - %.2f + %.2f",
                 1000*nominalResult.arealDensity, 1000*rhoR_Uncertainties[0], 1000*rhoR_Uncertainties[1]);
 
@@ -144,6 +155,7 @@ public class Analyzer {
                 10000*nominalResult.fuelRadius, 10000*R_Uncertainties[0], 10000*R_Uncertainties[1]);
 
         parentGUI.writeToLog(" === DONE! === ");
+        */
 
 
         // ************
