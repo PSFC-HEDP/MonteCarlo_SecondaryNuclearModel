@@ -50,19 +50,6 @@ public class Plasma {
     // ArrayList of Particle Species in this Plasma
     private ArrayList<PlasmaSpecies> plasmaSpecies = new ArrayList<>();
 
-    // Ion Temperature radial profile define between [rMin, rMax] (keV)
-    // Internally, binEdges are mapped to the normalized units of [0, 1]
-    private PolynomialSplineFunction ionTemperature;
-
-    // Electron Temperature radial profile defined between [rMin, rMax] (keV)
-    // Internally, binEdges are mapped to the normalized units of [0, 1]
-    private PolynomialSplineFunction electronTemperature;
-
-    // Mass density radial profile defined between [rMin, rMax] (keV)
-    // Internally, binEdges are mapped to the normalized units of [0, 1]
-    private PolynomialSplineFunction massDensity;
-
-
     // Some flags we'll use for special cases that can be used to speed up computational time
     private boolean boundsVaryInTheta = false;
     private boolean boundsVaryInPhi   = false;
@@ -73,59 +60,15 @@ public class Plasma {
      * Default constructor for building a plasma object
      * At least 1 species needs to be added in addition to this construction
      * At least 1 outer Legendre mode (usually a P0) needs to be defined in addition to this construction
-     *
-     * @param radiusNodes Nodes (units arbitrary) on which the plasma properties are known (will be normalized internally)
-     * @param ionTemperature Ion temperature (in keV) evaluated at the radius nodes
-     * @param electronTemperature Electron temperature (in keV) evaluated at the radius nodes
-     * @param massDensity Mass density (in g/cc) evaluated at the radius nodes
      */
-    public Plasma(double[] radiusNodes, double[] ionTemperature, double[] electronTemperature, double[] massDensity) {
-        // Normalize the radii to [0, 1]
-        DoubleArray normalizedRadii = new DoubleArray(radiusNodes);
-        normalizedRadii.subtract(normalizedRadii.getMin());
-        normalizedRadii.multiply(1.0 / normalizedRadii.getMax());
+    public Plasma() {
 
-        // Floating point issues, we need to edges to be EXACTLY [0, 1]
-        normalizedRadii.set(0, 0);
-        normalizedRadii.set(normalizedRadii.length()-1, 1);
-
-        this.ionTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), ionTemperature);
-        this.electronTemperature = new SplineInterpolator().interpolate(normalizedRadii.getValues(), electronTemperature);
-        this.massDensity = new SplineInterpolator().interpolate(normalizedRadii.getValues(), massDensity);
-    }
-
-
-    /**
-     * Returns a plasma with a constant Ti = Te = 1 keV and constant rho = 1 g/cc
-     * Use setBurnAveragedIonTemperature to set ion temperature
-     * Use setElectronTemperatureFraction to set electron temperature
-     * Use setAverageMassDensity if mass density is known
-     * Use setTotalMass if total mass is known
-     *
-     * @param numberOfNodes nodes for the profiles
-     * @return a uniform plasma
-     */
-    public static Plasma uniformPlasma(int numberOfNodes){
-        double[] r = DoubleArray.linspace(0, 1, numberOfNodes).getValues();
-        double[] ones = DoubleArray.linspace(1, 1, numberOfNodes).getValues();
-        return new Plasma(r, ones, ones, ones);
     }
 
     public Plasma copy(){
 
-        // Recreate the profiles
-        double[] r   = this.getNormalizedRadiusNodes();
-        double[] Ti  = new double[r.length];
-        double[] Te  = new double[r.length];
-        double[] rho = new double[r.length];
-        for (int i = 0; i < r.length; i++){
-            Ti[i]  = ionTemperature.value(r[i]);
-            Te[i]  = electronTemperature.value(r[i]);
-            rho[i] = massDensity.value(r[i]);
-        }
-
         // Create the plasma object
-        Plasma copy = new Plasma(r, Ti, Te, rho);
+        Plasma copy = new Plasma();
 
         // Inner Legendre Modes
         for (LegendreMode mode : innerBoundaryLegendreModes){
@@ -139,6 +82,7 @@ public class Plasma {
 
         // Plasma Species
         for (PlasmaSpecies species : plasmaSpecies){
+            // TODO: Properly copy species
             copy.addSpecies(new ParticleType(species.getZ(), species.getMass()),
                     species.getNumberFraction());
         }
@@ -368,128 +312,6 @@ public class Plasma {
     // Getter methods that evaluate the plasma conditions at some specific position vector
     // ***********************************************************************************
 
-    public double getIonTemperature(Vector3D position){
-        double[] coordinates = Utils.getSphericalFromVector(position);
-
-        double R     = coordinates[0];
-        double theta = coordinates[1];
-        double phi   = coordinates[2];
-
-        double minRadius  = getInnerRadiusBound(theta, phi);
-        double maxRadius  = getOuterRadiusBound(theta, phi);
-        double normRadius = (R - minRadius) / (maxRadius - minRadius);
-
-        try {
-            return ionTemperature.value(normRadius);
-        }
-
-        catch (OutOfRangeException e){
-            double[] knots = ionTemperature.getKnots();
-            double maxValue = knots[knots.length-1];
-
-            if (normRadius - maxValue < OUT_BOUNDS_EPSILON){
-                return ionTemperature.value(maxValue);
-            }
-
-            e.printStackTrace();
-            System.err.printf("Warning! Ion temperature evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
-        }
-
-        return Double.NaN;
-    }
-
-    public double getElectronTemperature(Vector3D position) {
-        double[] coordinates = Utils.getSphericalFromVector(position);
-
-        double R     = coordinates[0];
-        double theta = coordinates[1];
-        double phi   = coordinates[2];
-
-        double minRadius  = getInnerRadiusBound(theta, phi);
-        double maxRadius  = getOuterRadiusBound(theta, phi);
-        double normRadius = (R - minRadius) / (maxRadius - minRadius);
-
-        try {
-            return electronTemperature.value(normRadius);
-        }
-
-        catch (OutOfRangeException e){
-            double[] knots = electronTemperature.getKnots();
-            double maxValue = knots[knots.length-1];
-
-            if (normRadius - maxValue < OUT_BOUNDS_EPSILON){
-                return electronTemperature.value(maxValue);
-            }
-
-            System.err.printf("Warning! Electron temperature evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
-        }
-
-        return Double.NaN;
-    }
-
-    public double getMassDensity(Vector3D position){
-        double[] coordinates = Utils.getSphericalFromVector(position);
-
-        double R     = coordinates[0];
-        double theta = coordinates[1];
-        double phi   = coordinates[2];
-
-        double minRadius  = getInnerRadiusBound(theta, phi);
-        double maxRadius  = getOuterRadiusBound(theta, phi);
-        double normRadius = (R - minRadius) / (maxRadius - minRadius);
-
-        try {
-            return massDensity.value(normRadius);
-        }
-
-        catch (OutOfRangeException e){
-            double[] knots = massDensity.getKnots();
-            double maxValue = knots[knots.length-1];
-
-            if (normRadius - maxValue < OUT_BOUNDS_EPSILON){
-                return massDensity.value(maxValue);
-            }
-
-            System.err.printf("Warning! Mass density evaluation %.4f%% out of bounds\n", 100*(R - maxRadius)/maxRadius);
-        }
-
-        return Double.NaN;
-    }
-
-    public double getSpeciesMassDensity(Vector3D r, ParticleType type){
-        return getSpeciesNumberDensity(r, type) * type.getMass() * Constants.GRAMS_PER_AMU;
-    }
-
-    public double getIonNumberDensity(Vector3D r){
-        return numberDensityFromRho(getMassDensity(r));
-    }
-
-    public double getElectronNumberDensity(Vector3D r){
-
-        // Init the electron density
-        double ne = 0;
-
-        // Get the total ion density
-        double n   = getIonNumberDensity(r);
-
-        // Loop through all the plasma species
-        for (PlasmaSpecies species : plasmaSpecies){
-
-            // Get the number fraction
-            double fi = species.getNumberFraction();
-
-            // Get the Zbar (using Drake ionization assumption)
-            double Zbar = 20*Math.sqrt(getIonTemperature(r));
-            Zbar = Math.min(Zbar, species.getZ());
-
-            // Add these electrons to the total
-            ne += (fi * n * Zbar);
-        }
-
-        // Return
-        return ne;
-
-    }
 
     public double getSpeciesNumberDensity(Vector3D r, ParticleType type){
 
@@ -933,14 +755,19 @@ public class Plasma {
      */
     private class PlasmaSpecies {
 
+        // Particle type
         private ParticleType type;
-        private double numberProportion;    // Not guaranteed to be normalized
-        private double numberFraction;      // Guaranteed to be normalized
 
-        PlasmaSpecies(ParticleType type, double numberProportion) {
+        // Number density radial profile define between [rMin, rMax] (# per cc)
+        private PolynomialSplineFunction numberDensity;
+
+        // Temperature radial profile define between [rMin, rMax] (keV)
+        private PolynomialSplineFunction temperature;
+
+        PlasmaSpecies(ParticleType type, double[] r, double[] n, double[] T) {
             this.type = type;
-            this.numberProportion = numberProportion;
-            this.numberFraction = numberProportion;
+            this.numberDensity = new SplineInterpolator().interpolate(r, n);
+            this.temperature = new SplineInterpolator().interpolate(r, T);
         }
 
         ParticleType getType() {
@@ -955,8 +782,37 @@ public class Plasma {
             return type.getMass();
         }
 
-        double getNumberFraction() {
-            return numberFraction;
+
+        public double getNumberDensity(Vector3D position) {
+
+            double normRadius = getNormRadius(position);
+
+            try {
+                return numberDensity.value(normRadius);
+            }
+
+            catch (OutOfRangeException e){
+                System.err.printf("Attempt to eval %s n density out of bounds!\n", type);
+                System.exit(-1);
+            }
+
+            return Double.NaN;
+        }
+
+        public double getTemperature(Vector3D position){
+
+            double normRadius = getNormRadius(position);
+
+            try {
+                return temperature.value(normRadius);
+            }
+
+            catch (OutOfRangeException e){
+                System.err.printf("Attempt to eval %s temperature out of bounds!\n", type);
+                System.exit(-1);
+            }
+
+            return Double.NaN;
         }
     }
 
@@ -1019,6 +875,21 @@ public class Plasma {
 
     private double numberDensityFromRho(double rho){
         return rho / (getAverageMass() * 1000 * Constants.PROTON_MASS_KG);
+    }
+
+    private double getNormRadius(Vector3D position) {
+
+        double[] coordinates = Utils.getSphericalFromVector(position);
+
+        double R     = coordinates[0];
+        double theta = coordinates[1];
+        double phi   = coordinates[2];
+
+        double minRadius  = getInnerRadiusBound(theta, phi);
+        double maxRadius  = getOuterRadiusBound(theta, phi);
+
+        return  (R - minRadius) / (maxRadius - minRadius);
+
     }
 
 

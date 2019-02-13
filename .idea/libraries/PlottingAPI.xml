@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="PlottingAPI">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/lib/PlottingAPI.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>

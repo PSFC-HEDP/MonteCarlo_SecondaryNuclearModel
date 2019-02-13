@@ -3,8 +3,8 @@ package SecondaryDTnAnalysisGUI;
 public class Temp_Database {
 
     public static Data[] data = {
-            new Data(6.7575e+12, 3.1916e+11, 6.6400e+10, 2.2500e+09, 2.7700e+00-0.5, 1.6166e-01, 9.0968e+02, 6.5102e+01, 3.9889e+00)
-    };
+            new Data(3.1020e+11, 1.4774e+10, 2.0600e+09, 1.4600e+08, 1.5159e+00, 1.4120e-01, 1.1280e+03, 7.8208e+01, 4.6091e+00)
+            };
 
     public static class Data {
 
