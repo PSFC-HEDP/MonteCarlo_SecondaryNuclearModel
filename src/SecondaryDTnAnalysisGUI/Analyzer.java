@@ -7,6 +7,7 @@ import PlottingAPI.ShapeProperties;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -35,6 +36,20 @@ public class Analyzer {
         this.profileExponent = profileExponent;
         this.numParticles = numParticles;
         this.numCPUs = numCPUs;
+    }
+
+    public void getSecondaryYield(NTOF_Trace[] traces) {
+
+        for (NTOF_Trace trace : traces) {
+
+            Figure fig = new Figure();
+            fig.plot(trace.time, trace.voltage);
+            fig.setPreferredSize(new Dimension(800, 600));
+
+            System.out.println("Now!");
+
+        }
+
     }
 
 

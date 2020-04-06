@@ -129,6 +129,10 @@ public class Model {
         this.productDirection = productDirection;
     }
 
+    public void setProductDirection(PTOF_Detector detector) {
+        this.productDirection = detector.getPosition();
+    }
+
 
     /**
      * Main method that sets up all of the individual Tasks and collects the tallys upon completion

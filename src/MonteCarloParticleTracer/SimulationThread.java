@@ -16,10 +16,10 @@ public class SimulationThread extends Thread {
      */
 
     // Width between energy nodes used in tallies                       TODO: Make a user input
-    private final double ENERGY_NODE_WIDTH = 0.01;                      // MeV
+    private final double ENERGY_NODE_WIDTH = 0.1;                      // MeV
 
     // Number of steps each source particle will take through any plasma
-    private final int MIN_NUM_STEPS = 200;
+    private final int MIN_NUM_STEPS = 50;
 
     // Tolerance for calculating the particle energy of the next step
     private final double ACCEPTABLE_ENERGY_ERROR   = 1e-3;              // Fraction

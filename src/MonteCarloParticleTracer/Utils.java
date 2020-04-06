@@ -1,8 +1,14 @@
 package MonteCarloParticleTracer;
 
+import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.geometry.euclidean.threed.SphericalCoordinates;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Created by lahmann on 2016-06-15.
@@ -31,7 +37,35 @@ public class Utils {
 
 
 
+    public static double[][] parseCSV(File file) throws Exception {
 
+        ArrayList<ArrayList<Double>> list = new ArrayList<>();
+
+        Scanner s = new Scanner(file);
+        while (s.hasNextLine()) {
+
+            String[] entries = s.nextLine().split(",");
+            while (list.size() < entries.length) {
+                list.add(new ArrayList<>());
+            }
+
+            for (int i = 0; i < entries.length; i++) {
+                list.get(i).add(Double.parseDouble(entries[i]));
+            }
+
+        }
+        s.close();
+
+        double[][] data = new double[list.size()][list.get(0).size()];
+        for (int i = 0; i < data.length; i++) {
+            for (int j = 0; j < data[i].length; j++) {
+                data[i][j] = list.get(i).get(j);
+            }
+        }
+
+        return data;
+
+    }
 
     static double getNormalizedRadius(Particle particle, Plasma plasma){
         double[] coordinates = Utils.getSphericalFromVector(particle.getPosition());

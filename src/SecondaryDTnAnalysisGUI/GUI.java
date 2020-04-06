@@ -7,6 +7,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.font.TextAttribute;
+import java.io.File;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -634,7 +635,7 @@ public class GUI extends JFrame implements WindowListener {
 
                 ParticleType species = new ParticleType(
                         Double.valueOf(entry.ZTextField.getValue().toString()).intValue(),
-                        Double.valueOf(entry.ATextField.getValue().toString()));
+                        Double.parseDouble(entry.ATextField.getValue().toString()));
                 fuelSpecies.add(species);
 
                 if (species.equals(ParticleType.deuteron))  deuteriumPresent = true;
@@ -649,28 +650,30 @@ public class GUI extends JFrame implements WindowListener {
             }
 
             // Convert all of the other fields to primitives
-            Y1n = Double.valueOf(primaryYieldValueField.getValue().toString());
-            Y1n_Unc = Double.valueOf(primaryYieldUncertaintyField.getValue().toString());
+            Y1n = Double.parseDouble(primaryYieldValueField.getValue().toString());
+            Y1n_Unc = Double.parseDouble(primaryYieldUncertaintyField.getValue().toString());
 
-            Y2n = Double.valueOf(secondaryYieldValueField.getValue().toString());
-            Y2n_Unc = Double.valueOf(secondaryYieldUncertaintyField.getValue().toString());
+            Y2n = Double.parseDouble(secondaryYieldValueField.getValue().toString());
+            Y2n_Unc = Double.parseDouble(secondaryYieldUncertaintyField.getValue().toString());
 
-            Te = Double.valueOf(electronTemperatureValueField.getValue().toString());
-            Te_Unc = Double.valueOf(electronTemperatureUncertaintyField.getValue().toString());
+            Te = Double.parseDouble(electronTemperatureValueField.getValue().toString());
+            Te_Unc = Double.parseDouble(electronTemperatureUncertaintyField.getValue().toString());
 
-            Ro = Double.valueOf(outerRadiusValueField.getValue().toString());
-            t = Double.valueOf(thicknessValueField.getValue().toString());
-            rho = Double.valueOf(initialDensityValueField.getValue().toString());
+            Ro = Double.parseDouble(outerRadiusValueField.getValue().toString());
+            t = Double.parseDouble(thicknessValueField.getValue().toString());
+            rho = Double.parseDouble(initialDensityValueField.getValue().toString());
 
             numParticles = Double.valueOf(numberParticlesValueField.getValue().toString()).intValue();
             numCPUs = Double.valueOf(numberCPUsValueField.getValue().toString()).intValue();
-            gamma = Double.valueOf(profileExponentValueField.getValue().toString());
+            gamma = Double.parseDouble(profileExponentValueField.getValue().toString());
 
         }
         catch (Exception e){
             writeToLog("Fill all fields before starting analysis!");
             return;
         }
+
+        NTOF_Trace specSP = new NTOF_Trace(new File("data/NTOF_Traces/SPEC_SP.dat"));
 
 
 
@@ -688,6 +691,7 @@ public class GUI extends JFrame implements WindowListener {
 
         // Create an analyzer
         Analyzer analyzer = new Analyzer(this, capsule, gamma, numParticles, numCPUs);
+        analyzer.getSecondaryYield(new NTOF_Trace[] { specSP });
 
 
         // Create a separate thread to run the analysis

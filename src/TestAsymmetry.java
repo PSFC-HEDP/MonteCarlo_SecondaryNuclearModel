@@ -2,74 +2,69 @@ import MonteCarloParticleTracer.*;
 import PlottingAPI.Figure;
 import PlottingAPI.LineProperties;
 import SecondaryDTnAnalysisGUI.Capsule;
-import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 
+import java.io.FileWriter;
 import java.util.ArrayList;
 
 public class TestAsymmetry {
 
-    private final static Vector3D SPEC_SP =
-            Utils.getVectorFromSpherical(1798, Math.toRadians(161), Math.toRadians(56));
+    private final static PTOF_Detector SPEC_SP = PTOF_Detector.SPEC_SP01_DT();
+    private final static PTOF_Detector SPEC_A  = PTOF_Detector.SPEC_A01_DT();
+    private final static PTOF_Detector SPEC_E  = PTOF_Detector.SPEC_E01_DT();
+    private final static PTOF_Detector SPEC_NP = PTOF_Detector.SPEC_NP01_DT();
 
-    private final static Vector3D SPEC_A =
-            Utils.getVectorFromSpherical(2222, Math.toRadians(116), Math.toRadians(316));
-
-    private final static Vector3D SPEC_E =
-            Utils.getVectorFromSpherical(2009, Math.toRadians(90), Math.toRadians(174));
-
-    private final static Vector3D SPEC_NP =
-            Utils.getVectorFromSpherical(2161, Math.toRadians(18), Math.toRadians(303));
-
-
-
-    public static void main(String ... args){
+    public static void main(String ... args) throws Exception{
 
         // Grab a capsule
         Capsule capsule = getD2Capsule(1100, 100, 4.0);
 
-        // Build the fuel plasma
-        Plasma fuelPlasma = capsule.getFuelPlasma(4.0, 10.0, 0.0);
-        fuelPlasma.addOuterLegendreMode(2, 0, -0.4*fuelPlasma.getOuterRadiusBound(0.0,0.0));
-        //fuelPlasma.DEBUG_dumpOuterBounds();
-        //fuelPlasma.DEBUG_printOuterModes();
+        // Detector LOS
+        PTOF_Detector detector = SPEC_NP;
 
-        // Build the model
-        SecondaryDTnModel model = new SecondaryDTnModel("temp.OUTPUT");
-        model.addPlasmaLayer(fuelPlasma);
-
-        Figure neutronFigure = new Figure("Secondary DT Spectrum", "Energy (MeV)", "Yield / MeV");
-
-        neutronFigure.setLocation(100, 100 );
+        /*
+        Figure neutronFigure = new Figure("SPEC-SP DT Spectrum", "Time (s)", "Volts / Yield");
+        neutronFigure.setLocation(100, 100);
         neutronFigure.setSize(600, 400);
+        neutronFigure.setYLimits(0, 1e-12);
+        neutronFigure.setXLimits(0, 1e-6);
+         */
 
 
-        model.setProductDirection(SPEC_SP);
-        model.runSimulation((int) 1e5, 24);
-        System.out.printf("%.4e ", model.getYieldRatio());
-        Tally data = model.getSecondaryDTNeutronSpectrum();
-        neutronFigure.plot(data.getBinCenters(), data.getWeights());
+        DoubleArray CRs = new DoubleArray(new double[] {5.0});
+        DoubleArray P2s = DoubleArray.linspace(-0.4, 0.4, 3);
+        double gamma = 0;
+
+        FileWriter w = new FileWriter(detector.getName() + ".dat");
+        for (int i = 0; i < P2s.length(); i++) {
+            for (int j = 0; j < CRs.length(); j++) {
+
+                // Build the fuel plasma
+                Plasma fuelPlasma = capsule.getFuelPlasma(4.0, CRs.get(j), gamma);
+                fuelPlasma.addOuterLegendreMode(2, 0, P2s.get(i) * fuelPlasma.getOuterRadiusBound(0.0, 0.0));
+
+                // Build the model
+                String shape = "";
+                if (P2s.get(i) > 0) shape = "prolate";
+                else if (P2s.get(i) < 0) shape = "oblate";
+                else shape = "round";
 
 
-        model.setProductDirection(SPEC_A);
-        model.runSimulation((int) 1e5, 24);
-        System.out.printf("%.4e ", model.getYieldRatio());
-        data = model.getSecondaryDTNeutronSpectrum();
-        neutronFigure.plot(data.getBinCenters(), data.getWeights());
+                String name = String.format("output/%s_%s_CR_%.1f_P2_%.1f_Gamma_%.4f_1e6.output", detector.getName(), shape, CRs.get(j), Math.abs(100 * P2s.get(i)), gamma);
+                System.out.println(name);
+                SecondaryDTnModel model = new SecondaryDTnModel(name);
+                model.addPlasmaLayer(fuelPlasma);
+                model.setProductDirection(detector);
+                model.runSimulation((int) 2e6, 45);
 
+                Tally data = detector.generateResponse(model.getSecondaryDTNeutronSpectrum());
+                //System.out.println(data);
+                w.write(name + "\n");
+                w.write(data.toString() + "\n");
+                //neutronFigure.plot(data.getBinCenters(), data.getWeights(), LineProperties.blackLine(2));
 
-        model.setProductDirection(SPEC_E);
-        model.runSimulation((int) 1e5, 24);
-        System.out.printf("%.4e ", model.getYieldRatio());
-        data = model.getSecondaryDTNeutronSpectrum();
-        neutronFigure.plot(data.getBinCenters(), data.getWeights());
-
-
-        model.setProductDirection(SPEC_NP);
-        model.runSimulation((int) 1e5, 24);
-        System.out.printf("%.4e ", model.getYieldRatio());data = model.getSecondaryDTNeutronSpectrum();
-        neutronFigure.plot(data.getBinCenters(), data.getWeights());
-
-
+            }
+        }
+        w.close();
 
     }
 

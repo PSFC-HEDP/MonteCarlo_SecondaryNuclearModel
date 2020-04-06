@@ -43,7 +43,7 @@ public class ENDF_Parser {
             int MT   = Integer.parseInt(entries[8]);
             int LINE = Integer.parseInt(entries[9]);
 
-            // We don't care about anything at isn't our reaction
+            // We don't care about anything that isn't our reaction
             if (MT != requestedReaction){
                 continue;
             }
